@@ -1,0 +1,33 @@
+<?php
+
+namespace App\Repositories;
+
+use App\Models\Todo;
+use Illuminate\Support\Facades\DB;
+
+class StatsRepository
+{
+    /**
+     * Durum bazında todo sayıları
+     * @return array
+     */
+    public function getTodosCountByStatus(): array
+    {
+        return Todo::select('status', DB::raw('count(*) as total'))
+            ->groupBy('status')
+            ->pluck('total', 'status')
+            ->toArray();
+    }
+
+    /**
+     * Öncelik bazında todo sayıları
+     * @return array
+     */
+    public function getTodosCountByPriority(): array
+    {
+        return Todo::select('priority', DB::raw('count(*) as total'))
+            ->groupBy('priority')
+            ->pluck('total', 'priority')
+            ->toArray();
+    }
+}
