@@ -3,13 +3,26 @@
 namespace App\Repositories;
 
 use App\Models\Todo;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Pagination\LengthAwarePaginator;
 
 class TodoRepository
 {
-    public function getAll(array $filters = [], int $limit = 10, string $sort = 'created_at', string $order = 'desc')
+    protected $model;
+
+    public function __construct(Todo $model)
     {
-        $query = Todo::query()->with('categories'); // Kategori ilişkisini de çek
+        $this->model = $model;
+    }
+
+    /**
+     * Tüm todoları getirir (filtreleme, sıralama ve sayfalama ile).
+     * Kategorileri eager load eder.
+     */
+    public function getAll(array $filters = [], int $limit = 10, string $sort = 'created_at', string $order = 'desc'): LengthAwarePaginator
+    {
+        $query = $this->model->newQuery();
+
+        $query->with('categories');
 
         if (isset($filters['status'])) {
             $query->where('status', $filters['status']);
@@ -20,65 +33,78 @@ class TodoRepository
         }
 
         if (isset($filters['q'])) {
-            $query->where(function($q) use ($filters) {
-                $q->where('title', 'like', "%{$filters['q']}%")
-                  ->orWhere('description', 'like', "%{$filters['q']}%");
+            $query->where(function ($q) use ($filters) {
+                $q->where('title', 'like', '%' . $filters['q'] . '%')
+                  ->orWhere('description', 'like', '%' . $filters['q'] . '%');
             });
         }
 
-        return $query->orderBy($sort, $order)
-            ->paginate(min($limit, 50));
+        return $query->orderBy($sort, $order)->paginate($limit);
     }
 
-    public function find($id)
+    /**
+     * Belirli bir todoyu ID'sine göre getirir.
+     * Kategorileri eager load eder.
+     */
+    public function findById(int $id): ?Todo
     {
-        return Todo::with('categories', 'user')->findOrFail($id);
+        return $this->model->with('categories')->find($id);
     }
 
-    public function create(array $data)
+    /**
+     * Yeni bir todo oluşturur.
+     * Bu metot genellikle sadece todo'nun ana verilerini oluşturur, pivot tablo ilişkilerini değil.
+     * İlişkilendirme Controller'da veya Service'de yapılabilir.
+     */
+    public function create(array $data): Todo
     {
-        $todo = Todo::create($data);
-        // Kategori ilişkilendirme mantığı artık TodoService'de.
+        return $this->model->create($data);
+    }
+
+    /**
+     * Mevcut bir todoyu günceller.
+     * Bu metot genellikle sadece todo'nun ana verilerini günceller, pivot tablo ilişkilerini değil.
+     * İlişkilendirme Controller'da veya Service'de yapılabilir.
+     */
+    public function update(int $id, array $data): ?Todo
+    {
+        $todo = $this->model->find($id);
+        if ($todo) {
+            $todo->update($data);
+        }
         return $todo;
     }
 
-    public function update($id, array $data)
+    /**
+     * Belirli bir todonun durumunu günceller.
+     */
+    public function updateStatus(int $id, string $status): ?Todo
     {
-        $todo = Todo::findOrFail($id);
-        $todo->update($data);
-        // Kategori ilişkilendirme mantığı artık TodoService'de.
+        $todo = $this->model->find($id);
+        if ($todo) {
+            $todo->update(['status' => $status]);
+        }
         return $todo;
     }
 
-    public function updateStatus($id, $status)
+    /**
+     * Belirli bir todoyu siler.
+     */
+    public function delete(int $id): bool
     {
-        $todo = Todo::findOrFail($id);
-        $todo->status = $status;
-        $todo->save();
-
-        return $todo;
+        return (bool) $this->model->destroy($id);
     }
 
-    public function delete($id)
+    /**
+     * Todolar arasında arama yapar.
+     * Kategorileri eager load eder.
+     */
+    public function search(string $query): LengthAwarePaginator
     {
-        $todo = Todo::findOrFail($id);
-        // İlişkili kayıtları da silmek isteyebilirsiniz (eğer kategoriler de silinecekse)
-        // $todo->categories()->detach(); // Kategori ilişkilerini kaldır
-        $todo->delete();
-        return true;
-    }
-
-    public function findById(int $id) //: ?Todo
-    {
-        // Kategori ilişkisi ile birlikte çekilmesi için `with('categories')` eklendi
-        return Todo::with('categories')->find($id);
-    }
-
-
-    public function search(string $query, int $limit = 10, int $page = 1)
-    {
-        return Todo::where('title', 'like', "%{$query}%")
-                    ->orWhere('description', 'like', "%{$query}%")
-                    ->paginate($limit, ['*'], 'page', $page);
+        return $this->model->newQuery()
+            ->with('categories') 
+            ->where('title', 'like', '%' . $query . '%')
+            ->orWhere('description', 'like', '%' . $query . '%')
+            ->paginate(10);
     }
 }

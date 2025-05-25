@@ -16,7 +16,7 @@ class UserRepository
     // Tüm kullanıcıları sayfalı şekilde getir
     public function getAll(int $limit = 10)
     {
-        return $this->model->paginate(min($limit, 50)); // limit max 50
+        return $this->model->paginate(min($limit, 50)); 
     }
 
     // ID ile kullanıcı bul

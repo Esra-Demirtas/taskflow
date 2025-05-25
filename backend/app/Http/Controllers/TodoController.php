@@ -9,6 +9,8 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Auth; 
+use App\Models\Todo;
+use App\Models\Category;
 
 class TodoController extends Controller
 {
@@ -25,15 +27,15 @@ class TodoController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-    $filters = $request->only(['status', 'priority', 'q']);
-    $limit = $request->get('limit', 10);
-    $sort = $request->get('sort', 'created_at');
-    $order = $request->get('order', 'desc');
+        $filters = $request->only(['status', 'priority', 'q']);
+        $limit = $request->get('limit', 10);
+        $sort = $request->get('sort', 'created_at');
+        $order = $request->get('order', 'desc');
 
-    $todos = $this->todoService->getAllTodos($filters, $limit, $sort, $order);
+        $todos = $this->todoService->getAllTodos($filters, $limit, $sort, $order);
 
-    return response()->json($todos); 
-}
+        return response()->json($todos); 
+    }
 
     /**
      * Belirli bir todoyu ID'sine göre getirir.
@@ -67,16 +69,19 @@ class TodoController extends Controller
                 'status' => 'required|in:pending,in_progress,completed,cancelled',
                 'priority' => 'required|in:low,medium,high',
                 'due_date' => 'nullable|date', 
-                'category_id' => 'nullable|exists:categories,id', 
+                'category_ids' => 'nullable|array', 
+                'category_ids.*' => 'integer|exists:categories,id',
             ]);
 
             $validatedData['user_id'] = Auth::id();
 
             $todo = $this->todoService->createTodo($validatedData);
 
-            if (isset($validatedData['category_id']) && $validatedData['category_id'] !== null) {
-                $todo->categories()->attach($validatedData['category_id']);
+            if (isset($validatedData['category_ids']) && count($validatedData['category_ids']) > 0) {
+                $todo->categories()->sync($validatedData['category_ids']);
             }
+
+            $todo->load('categories'); 
 
             return response()->json(['status' => 'success', 'data' => $todo], 201); // 201 Created
 
@@ -106,7 +111,8 @@ class TodoController extends Controller
                 'status' => 'sometimes|required|in:pending,in_progress,completed,cancelled',
                 'priority' => 'sometimes|required|in:low,medium,high',
                 'due_date' => 'nullable|date',
-                'category_id' => 'nullable|exists:categories,id',
+                'category_ids' => 'nullable|array',
+                'category_ids.*' => 'integer|exists:categories,id',
             ]);
 
             $todo = $this->todoService->updateTodo($id, $validatedData);
@@ -118,13 +124,15 @@ class TodoController extends Controller
                 ], 404);
             }
 
-            if (isset($validatedData['category_id'])) {
-                if ($validatedData['category_id'] !== null) {
-                    $todo->categories()->sync($validatedData['category_id']);
+            if (array_key_exists('category_ids', $validatedData)) {
+                if ($validatedData['category_ids'] === null || count($validatedData['category_ids']) === 0) {
+                    $todo->categories()->detach(); 
                 } else {
-                    $todo->categories()->detach();
+                    $todo->categories()->sync($validatedData['category_ids']); 
                 }
             }
+
+            $todo->load('categories');
 
             return response()->json([
                 'status' => 'success',
@@ -162,6 +170,8 @@ class TodoController extends Controller
                 'message' => 'Durumu güncellenecek todo bulunamadı.',
             ], 404);
         }
+
+        $todo->load('categories');
 
         return response()->json([
             'status' => 'success',

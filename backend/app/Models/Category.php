@@ -9,13 +9,20 @@ class Category extends Model
 {
     use HasFactory;
 
-    protected $fillable = [
+    /**
+     * The attributes that are mass assignable.
+     *
+     * @var array<int, string>
+     */
+     protected $fillable = [
         'name',
         'color',
     ];
-
-    public function todos()
+   
+    /**
+     * Bir kategorinin sahip olduğu todoları döndürür.
+    */    public function todos()
     {
-        return $this->belongsToMany(Todo::class, 'todo_category');
+        return $this->belongsToMany(Todo::class, 'todo_category', 'category_id', 'todo_id');
     }
 }
