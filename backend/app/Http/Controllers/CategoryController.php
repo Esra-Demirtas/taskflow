@@ -5,142 +5,158 @@ namespace App\Http\Controllers;
 use App\Http\Controllers\Controller;
 use App\Services\CategoryService;
 use Illuminate\Http\Request;
-use Illuminate\Validation\ValidationException;
+use Illuminate\Http\JsonResponse; // JsonResponse tip bildirimi için
+
+// Handler.php tarafından yakalanacak istisnalar için manuel importlara gerek yok:
+// use Illuminate\Validation\ValidationException; 
+
+use App\Traits\ApiResponse; // <-- Bu satırı ekleyin
+use Symfony\Component\HttpFoundation\Response; // <-- HTTP durum kodları için bu satırı ekleyin
+use Illuminate\Database\Eloquent\ModelNotFoundException; // Kaynak bulunamadığında fırlatmak için
 
 class CategoryController extends Controller
 {
+    use ApiResponse; // <-- Bu satırı ekleyin
+
     protected $service;
 
     public function __construct(CategoryService $service)
     {
         $this->service = $service;
+        // İhtiyaç duyulursa buraya middleware eklenebilir, örn:
+        // $this->middleware('auth:sanctum');
     }
 
     /**
      * GET /api/categories
+     * Tüm kategorileri listeler.
      */
-    public function index()
+    public function index(): JsonResponse
     {
         $categories = $this->service->list();
 
-        return response()->json([
-            'status' => 'success',
-            'data' => $categories,
-        ], 200);
+        // API Response Trait'ini kullanarak başarılı yanıt döndür
+        return $this->successResponse(
+            'Kategoriler başarıyla listelendi.',
+            $categories,
+            Response::HTTP_OK // 200 OK
+        );
     }
 
     /**
      * GET /api/categories/{id}
+     * Belirli bir kategoriyi ID'sine göre getirir.
      */
-    public function show($id)
+    public function show($id): JsonResponse
     {
         $category = $this->service->getById($id);
 
         if (!$category) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Kategori bulunamadı',
-            ], 404);
+            // Kaynak bulunamadığında ModelNotFoundException fırlatıyoruz.
+            // Bu istisna Handler.php tarafından yakalanacak ve 404 döndürecek.
+            throw new ModelNotFoundException('Kategori bulunamadı.');
         }
 
-        return response()->json([
-            'status' => 'success',
-            'data' => $category,
-        ], 200);
+        // API Response Trait'ini kullanarak başarılı yanıt döndür
+        return $this->successResponse(
+            'Kategori detayları getirildi.',
+            $category,
+            Response::HTTP_OK // 200 OK
+        );
     }
 
     /**
      * POST /api/categories
+     * Yeni bir kategori oluşturur.
      */
-    public function store(Request $request)
+    public function store(Request $request): JsonResponse
     {
-        try {
-            $category = $this->service->create($request->all());
+        // Doğrulama kurallarını burada tanımlayın.
+        // Hatalı doğrulama durumunda ValidationException otomatik olarak Handler.php tarafından yakalanır.
+        $validatedData = $request->validate([
+            'name' => 'required|string|max:255|unique:categories,name',
+            // Diğer doğrulama kuralları
+        ]);
 
-            return response()->json([
-                'status' => 'success',
-                'message' => 'Kategori oluşturuldu',
-                'data' => $category,
-            ], 201);
-        } catch (ValidationException $e) {
-            return response()->json([
-                'status' => 'error',
-                'errors' => $e->errors(),
-            ], 422);
-        } catch (\Exception $e) {
-            return response()->json([
-                'status' => 'error',
-                'message' => $e->getMessage(),
-            ], $e->getCode() ?: 500);
-        }
+        $category = $this->service->create($validatedData);
+
+        // API Response Trait'ini kullanarak başarılı yanıt döndür
+        return $this->successResponse(
+            'Kategori başarıyla oluşturuldu.',
+            $category,
+            Response::HTTP_CREATED // 201 Created
+        );
     }
 
     /**
      * PUT /api/categories/{id}
+     * Mevcut bir kategoriyi günceller.
      */
-    public function update(Request $request, $id)
+    public function update(Request $request, $id): JsonResponse
     {
-        try {
-            $category = $this->service->update($id, $request->all());
+        // Doğrulama kurallarını burada tanımlayın.
+        // `name` alanı güncellenirken kendi ID'sini göz ardı etmek için `unique` kuralına dikkat edin.
+        $validatedData = $request->validate([
+            'name' => 'sometimes|required|string|max:255|unique:categories,name,' . $id,
+            // Diğer doğrulama kuralları
+        ]);
 
-            return response()->json([
-                'status' => 'success',
-                'message' => 'Kategori güncellendi',
-                'data' => $category,
-            ], 200);
-        } catch (ValidationException $e) {
-            return response()->json([
-                'status' => 'error',
-                'errors' => $e->errors(),
-            ], 422);
-        } catch (\Exception $e) {
-            $statusCode = $e->getCode() ?: 500;
-            return response()->json([
-                'status' => 'error',
-                'message' => $e->getMessage(),
-            ], $statusCode);
+        $category = $this->service->update($id, $validatedData);
+
+        if (!$category) {
+            // Kaynak bulunamadığında ModelNotFoundException fırlatıyoruz.
+            throw new ModelNotFoundException('Güncellenecek kategori bulunamadı.');
         }
+
+        // API Response Trait'ini kullanarak başarılı yanıt döndür
+        return $this->successResponse(
+            'Kategori başarıyla güncellendi.',
+            $category,
+            Response::HTTP_OK // 200 OK
+        );
     }
 
     /**
      * DELETE /api/categories/{id}
+     * Belirli bir kategoriyi siler.
      */
-    public function destroy($id)
+    public function destroy($id): JsonResponse
     {
-        try {
-            $this->service->delete($id);
+        $deleted = $this->service->delete($id);
 
-            return response()->json([
-                'status' => 'success',
-                'message' => 'Kategori silindi',
-            ], 204);
-        } catch (\Exception $e) {
-            $statusCode = $e->getCode() ?: 500;
-            return response()->json([
-                'status' => 'error',
-                'message' => $e->getMessage(),
-            ], $statusCode);
+        if (!$deleted) {
+            // Kaynak bulunamadığında ModelNotFoundException fırlatıyoruz.
+            throw new ModelNotFoundException('Silinecek kategori bulunamadı.');
         }
+
+        // API Response Trait'ini kullanarak başarılı yanıt döndür
+        return $this->successResponse(
+            'Kategori başarıyla silindi.',
+            null, // Silme işleminde genellikle veri dönülmez
+            Response::HTTP_NO_CONTENT // 204 No Content
+        );
     }
 
     /**
      * GET /api/categories/{id}/todos
+     * Bir kategoriye ait tüm todoları getirir.
      */
-    public function todos($id)
+    public function todos($id): JsonResponse
     {
-        try {
-            $todos = $this->service->getTodos($id);
+        // Servis katmanında kategori bulunamazsa zaten bir istisna fırlatılabilir.
+        // Eğer servis null dönüyorsa, burada da ModelNotFoundException fırlatabiliriz.
+        $todos = $this->service->getTodos($id);
 
-            return response()->json([
-                'status' => 'success',
-                'data' => $todos,
-            ], 200);
-        } catch (\Exception $e) {
-            $statusCode = $e->getCode() ?: 500;
-            return response()->json([
-                'status' => 'error',
-                'message' => $e->getMessage(),
-            ], $statusCode);
-        }
+        // getTodos metodunuz CategoryService içinde kategori bulunamazsa null dönüyorsa:
+        // if ($todos === null) {
+        //     throw new ModelNotFoundException('Kategoriye ait todolar bulunamadı veya kategori yok.');
+        // }
+
+        // API Response Trait'ini kullanarak başarılı yanıt döndür
+        return $this->successResponse(
+            'Kategoriye ait todolar listelendi.',
+            $todos,
+            Response::HTTP_OK // 200 OK
+        );
     }
 }

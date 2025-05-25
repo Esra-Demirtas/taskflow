@@ -5,15 +5,20 @@ namespace App\Http\Controllers;
 use App\Http\Controllers\Controller;
 use App\Services\TodoService;
 use Illuminate\Http\Request;
-use Illuminate\Http\JsonResponse;
-use Illuminate\Validation\ValidationException;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Auth; 
-use App\Models\Todo;
-use App\Models\Category;
+use Illuminate\Http\JsonResponse; // JsonResponse tip bildirimi için
+use Illuminate\Validation\ValidationException; // Bu artık Handler tarafından yakalanacak, manuel try-catch'e gerek kalmayacak
+use Illuminate\Support\Facades\Log; // Loglama için
+use Illuminate\Support\Facades\Auth;
+use App\Models\Todo; // ModelNotFoundException için
+use App\Models\Category; // İlişkiler için
+
+use App\Traits\ApiResponse; // <-- Bu satırı ekleyin
+use Symfony\Component\HttpFoundation\Response; // <-- HTTP durum kodları için bu satırı ekleyin
 
 class TodoController extends Controller
 {
+    use ApiResponse; // <-- Bu satırı ekleyin
+
     protected $todoService;
 
     public function __construct(TodoService $todoService)
@@ -34,7 +39,22 @@ class TodoController extends Controller
 
         $todos = $this->todoService->getAllTodos($filters, $limit, $sort, $order);
 
-        return response()->json($todos); 
+        // API Response Trait'ini kullanarak başarılı yanıt döndür
+        return $this->successResponse(
+            'Todolar başarıyla listelendi.',
+            $todos->items(), // Sayfalama verilerini ayırıp sadece öğeleri gönderiyoruz
+            Response::HTTP_OK, // 200 OK
+            [
+                'pagination' => [
+                    'total'        => $todos->total(),
+                    'per_page'     => $todos->perPage(),
+                    'current_page' => $todos->currentPage(),
+                    'last_page'    => $todos->lastPage(),
+                    'from'         => $todos->firstItem(),
+                    'to'           => $todos->lastItem(),
+                ]
+            ]
+        );
     }
 
     /**
@@ -45,16 +65,17 @@ class TodoController extends Controller
         $todo = $this->todoService->getTodoById($id);
 
         if (!$todo) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Todo bulunamadı.',
-            ], 404);
+            // Kaynak bulunamadığında ModelNotFoundException fırlatıyoruz.
+            // Bu istisna Handler.php tarafından yakalanacak ve 404 döndürecek.
+            throw new \Illuminate\Database\Eloquent\ModelNotFoundException('Todo bulunamadı.');
         }
 
-        return response()->json([
-            'status' => 'success',
-            'data' => $todo,
-        ]);
+        // API Response Trait'ini kullanarak başarılı yanıt döndür
+        return $this->successResponse(
+            'Todo detayları getirildi.',
+            $todo,
+            Response::HTTP_OK // 200 OK
+        );
     }
 
     /**
@@ -62,41 +83,33 @@ class TodoController extends Controller
      */
     public function store(Request $request): JsonResponse
     {
-        try {
-            $validatedData = $request->validate([
-                'title' => 'required|string|min:3|max:100',
-                'description' => 'nullable|string|max:500',
-                'status' => 'required|in:pending,in_progress,completed,cancelled',
-                'priority' => 'required|in:low,medium,high',
-                'due_date' => 'nullable|date', 
-                'category_ids' => 'nullable|array', 
-                'category_ids.*' => 'integer|exists:categories,id',
-            ]);
+        // ValidationException artık Handler.php tarafından yakalanacak, try-catch bloğuna gerek yok.
+        $validatedData = $request->validate([
+            'title' => 'required|string|min:3|max:100',
+            'description' => 'nullable|string|max:500',
+            'status' => 'required|in:pending,in_progress,completed,cancelled',
+            'priority' => 'required|in:low,medium,high',
+            'due_date' => 'nullable|date',
+            'category_ids' => 'nullable|array',
+            'category_ids.*' => 'integer|exists:categories,id',
+        ]);
 
-            $validatedData['user_id'] = Auth::id();
+        $validatedData['user_id'] = Auth::id();
 
-            $todo = $this->todoService->createTodo($validatedData);
+        $todo = $this->todoService->createTodo($validatedData);
 
-            if (isset($validatedData['category_ids']) && count($validatedData['category_ids']) > 0) {
-                $todo->categories()->sync($validatedData['category_ids']);
-            }
-
-            $todo->load('categories'); 
-
-            return response()->json(['status' => 'success', 'data' => $todo], 201); // 201 Created
-
-        } catch (ValidationException $e) {
-            return response()->json([
-                'status' => 'error',
-                'errors' => $e->errors(),
-            ], 422);
-        } catch (\Exception $e) {
-            Log::error('Todo oluşturulurken hata oluştu: ' . $e->getMessage());
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Todo oluşturulurken beklenmeyen bir hata oluştu.',
-            ], 500);
+        if (isset($validatedData['category_ids']) && count($validatedData['category_ids']) > 0) {
+            $todo->categories()->sync($validatedData['category_ids']);
         }
+
+        $todo->load('categories');
+
+        // API Response Trait'ini kullanarak başarılı yanıt döndür
+        return $this->successResponse(
+            'Todo başarıyla oluşturuldu.',
+            $todo,
+            Response::HTTP_CREATED // 201 Created
+        );
     }
 
     /**
@@ -104,53 +117,41 @@ class TodoController extends Controller
      */
     public function update(Request $request, $id): JsonResponse
     {
-        try {
-            $validatedData = $request->validate([
-                'title' => 'sometimes|required|string|min:3|max:100',
-                'description' => 'nullable|string|max:500',
-                'status' => 'sometimes|required|in:pending,in_progress,completed,cancelled',
-                'priority' => 'sometimes|required|in:low,medium,high',
-                'due_date' => 'nullable|date',
-                'category_ids' => 'nullable|array',
-                'category_ids.*' => 'integer|exists:categories,id',
-            ]);
+        // ValidationException artık Handler.php tarafından yakalanacak, try-catch bloğuna gerek yok.
+        $validatedData = $request->validate([
+            'title' => 'sometimes|required|string|min:3|max:100',
+            'description' => 'nullable|string|max:500',
+            'status' => 'sometimes|required|in:pending,in_progress,completed,cancelled',
+            'priority' => 'sometimes|required|in:low,medium,high',
+            'due_date' => 'nullable|date',
+            'category_ids' => 'nullable|array',
+            'category_ids.*' => 'integer|exists:categories,id',
+        ]);
 
-            $todo = $this->todoService->updateTodo($id, $validatedData);
+        $todo = $this->todoService->updateTodo($id, $validatedData);
 
-            if (!$todo) {
-                return response()->json([
-                    'status' => 'error',
-                    'message' => 'Güncellenecek todo bulunamadı.',
-                ], 404);
-            }
-
-            if (array_key_exists('category_ids', $validatedData)) {
-                if ($validatedData['category_ids'] === null || count($validatedData['category_ids']) === 0) {
-                    $todo->categories()->detach(); 
-                } else {
-                    $todo->categories()->sync($validatedData['category_ids']); 
-                }
-            }
-
-            $todo->load('categories');
-
-            return response()->json([
-                'status' => 'success',
-                'data' => $todo,
-            ]);
-
-        } catch (ValidationException $e) {
-            return response()->json([
-                'status' => 'error',
-                'errors' => $e->errors(),
-            ], 422);
-        } catch (\Exception $e) {
-            Log::error('Todo güncellenirken hata oluştu: ' . $e->getMessage());
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Todo güncellenirken beklenmeyen bir hata oluştu.',
-            ], 500);
+        if (!$todo) {
+            // Kaynak bulunamadığında ModelNotFoundException fırlatıyoruz.
+            // Bu istisna Handler.php tarafından yakalanacak ve 404 döndürecek.
+            throw new \Illuminate\Database\Eloquent\ModelNotFoundException('Güncellenecek todo bulunamadı.');
         }
+
+        if (array_key_exists('category_ids', $validatedData)) {
+            if ($validatedData['category_ids'] === null || count($validatedData['category_ids']) === 0) {
+                $todo->categories()->detach();
+            } else {
+                $todo->categories()->sync($validatedData['category_ids']);
+            }
+        }
+
+        $todo->load('categories');
+
+        // API Response Trait'ini kullanarak başarılı yanıt döndür
+        return $this->successResponse(
+            'Todo başarıyla güncellendi.',
+            $todo,
+            Response::HTTP_OK // 200 OK
+        );
     }
 
     /**
@@ -165,18 +166,19 @@ class TodoController extends Controller
         $todo = $this->todoService->updateStatus($id, $request->status);
 
         if (!$todo) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Durumu güncellenecek todo bulunamadı.',
-            ], 404);
+            // Kaynak bulunamadığında ModelNotFoundException fırlatıyoruz.
+            // Bu istisna Handler.php tarafından yakalanacak ve 404 döndürecek.
+            throw new \Illuminate\Database\Eloquent\ModelNotFoundException('Durumu güncellenecek todo bulunamadı.');
         }
 
         $todo->load('categories');
 
-        return response()->json([
-            'status' => 'success',
-            'data' => $todo,
-        ]);
+        // API Response Trait'ini kullanarak başarılı yanıt döndür
+        return $this->successResponse(
+            'Todo durumu başarıyla güncellendi.',
+            $todo,
+            Response::HTTP_OK // 200 OK
+        );
     }
 
     /**
@@ -187,16 +189,17 @@ class TodoController extends Controller
         $deleted = $this->todoService->deleteTodo($id);
 
         if (!$deleted) {
-             return response()->json([
-                'status' => 'error',
-                'message' => 'Silinecek todo bulunamadı.',
-            ], 404);
+            // Kaynak bulunamadığında ModelNotFoundException fırlatıyoruz.
+            // Bu istisna Handler.php tarafından yakalanacak ve 404 döndürecek.
+            throw new \Illuminate\Database\Eloquent\ModelNotFoundException('Silinecek todo bulunamadı.');
         }
 
-        return response()->json([
-            'status' => 'success',
-            'message' => 'Todo başarıyla silindi.',
-        ], 204);
+        // API Response Trait'ini kullanarak başarılı yanıt döndür
+        return $this->successResponse(
+            'Todo başarıyla silindi.',
+            null, // Silme işleminde genellikle data dönülmez
+            Response::HTTP_NO_CONTENT // 204 No Content
+        );
     }
 
     /**
@@ -207,17 +210,31 @@ class TodoController extends Controller
         $q = $request->query('q');
 
         if (!$q) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Arama terimi belirtilmelidir.',
-            ], 400);
+            // Geçersiz istek durumunda (arama terimi yoksa) manuel hata dönüyoruz.
+            // Bu tür basit validasyonlar için trait'teki errorResponse kullanılabilir.
+            return $this->errorResponse(
+                'Arama terimi belirtilmelidir.',
+                Response::HTTP_BAD_REQUEST // 400 Bad Request
+            );
         }
 
         $results = $this->todoService->searchTodos($q);
 
-        return response()->json([
-            'status' => 'success',
-            'data' => $results,
-        ]);
+        // API Response Trait'ini kullanarak başarılı yanıt döndür
+        return $this->successResponse(
+            'Arama sonuçları başarıyla listelendi.',
+            $results->items(), // Sayfalama verilerini ayırıp sadece öğeleri gönderiyoruz
+            Response::HTTP_OK, // 200 OK
+            [
+                'pagination' => [
+                    'total'        => $results->total(),
+                    'per_page'     => $results->perPage(),
+                    'current_page' => $results->currentPage(),
+                    'last_page'    => $results->lastPage(),
+                    'from'         => $results->firstItem(),
+                    'to'           => $results->lastItem(),
+                ]
+            ]
+        );
     }
 }
