@@ -9,7 +9,6 @@ class TodoCategoryTableSeeder extends Seeder
 {
     public function run()
     {
-        // Örnek olarak todo_id 1 ve 2'yi category_id 1 ve 3 ile ilişkilendirelim
         DB::table('todo_category')->insert([
             [
                 'todo_id' => 1,

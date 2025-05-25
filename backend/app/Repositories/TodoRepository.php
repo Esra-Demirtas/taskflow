@@ -9,7 +9,7 @@ class TodoRepository
 {
     public function getAll(array $filters = [], int $limit = 10, string $sort = 'created_at', string $order = 'desc')
     {
-        $query = Todo::query();
+        $query = Todo::query()->with('categories'); // Kategori ilişkisini de çek
 
         if (isset($filters['status'])) {
             $query->where('status', $filters['status']);
@@ -38,11 +38,7 @@ class TodoRepository
     public function create(array $data)
     {
         $todo = Todo::create($data);
-
-        if (isset($data['category_ids'])) {
-            $todo->categories()->sync($data['category_ids']);
-        }
-
+        // Kategori ilişkilendirme mantığı artık TodoService'de.
         return $todo;
     }
 
@@ -50,11 +46,7 @@ class TodoRepository
     {
         $todo = Todo::findOrFail($id);
         $todo->update($data);
-
-        if (isset($data['category_ids'])) {
-            $todo->categories()->sync($data['category_ids']);
-        }
-
+        // Kategori ilişkilendirme mantığı artık TodoService'de.
         return $todo;
     }
 
@@ -70,14 +62,18 @@ class TodoRepository
     public function delete($id)
     {
         $todo = Todo::findOrFail($id);
+        // İlişkili kayıtları da silmek isteyebilirsiniz (eğer kategoriler de silinecekse)
+        // $todo->categories()->detach(); // Kategori ilişkilerini kaldır
         $todo->delete();
         return true;
     }
 
-     public function findById(int $id): ?Todo
+    public function findById(int $id) //: ?Todo
     {
-        return Todo::find($id);
+        // Kategori ilişkisi ile birlikte çekilmesi için `with('categories')` eklendi
+        return Todo::with('categories')->find($id);
     }
+
 
     public function search(string $query, int $limit = 10, int $page = 1)
     {
@@ -85,4 +81,4 @@ class TodoRepository
                     ->orWhere('description', 'like', "%{$query}%")
                     ->paginate($limit, ['*'], 'page', $page);
     }
-} 
+}

@@ -4,42 +4,33 @@ namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
+use Carbon\Carbon;
 
 class TodosTableSeeder extends Seeder
 {
+    /**
+     * Run the database seeds.
+     *
+     * @return void
+     */
     public function run()
     {
-        DB::table('todos')->insert([
+        $userId = 1; 
+
+        $todos = [
             [
-                'title' => 'Proje Planlaması',
-                'description' => 'Proje için detaylı planlama yapılacak.',
+                'title' => 'Alışveriş Listesi Hazırla',
+                'description' => 'Marketten alınacaklar: Süt, ekmek, yumurta, sebze.',
                 'status' => 'pending',
                 'priority' => 'high',
-                'due_date' => '2025-06-30 18:00:00',
-                'created_at' => now(),
-                'updated_at' => now(),
+                'due_date' => Carbon::now()->addDays(2)->format('Y-m-d H:i:s'),
+                'user_id' => $userId,
+                'created_at' => Carbon::now(),
+                'updated_at' => Carbon::now(),
                 'deleted_at' => null,
             ],
-            [
-                'title' => 'API Geliştirme',
-                'description' => 'REST API uç noktaları hazırlanacak.',
-                'status' => 'in_progress',
-                'priority' => 'medium',
-                'due_date' => '2025-07-15 18:00:00',
-                'created_at' => now(),
-                'updated_at' => now(),
-                'deleted_at' => null,
-            ],
-            [
-                'title' => 'Testlerin Yazılması',
-                'description' => 'Tüm API uç noktaları için testler oluşturulacak.',
-                'status' => 'pending',
-                'priority' => 'low',
-                'due_date' => null,
-                'created_at' => now(),
-                'updated_at' => now(),
-                'deleted_at' => null,
-            ],
-        ]);
+        ];
+
+        DB::table('todos')->insert($todos);
     }
 }

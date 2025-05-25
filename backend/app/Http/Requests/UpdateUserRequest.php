@@ -8,13 +8,11 @@ class UpdateUserRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        // Yetki kontrolü burada yapılabilir
         return true;
     }
 
     public function rules(): array
     {
-        // $this->route('user') ile route parametresinden id alabiliriz.
         $userId = $this->route('user');
 
         return [

@@ -14,6 +14,10 @@ return new class extends Migration {
             $table->enum('status', ['pending', 'in_progress', 'completed', 'cancelled'])->default('pending');
             $table->enum('priority', ['low', 'medium', 'high'])->default('medium');
             $table->dateTime('due_date')->nullable();
+
+            // **User-Todo İlişkisi (Bire-Çok):** user_id'yi buraya ekliyoruz
+            $table->foreignId('user_id')->constrained()->onDelete('cascade'); // Kullanıcı silinince todo'lar da silinir
+
             $table->timestamps();
             $table->softDeletes();
         });

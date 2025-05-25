@@ -8,7 +8,6 @@ class StoreUserRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        // Burada yetkilendirme yapılabilir, şimdilik true
         return true;
     }
 

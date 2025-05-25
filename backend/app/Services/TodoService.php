@@ -5,6 +5,8 @@ namespace App\Services;
 use App\Repositories\TodoRepository;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
+use App\Models\Todo;
+
 
 class TodoService
 {
@@ -15,9 +17,9 @@ class TodoService
         $this->todoRepository = $todoRepository;
     }
 
-    public function getAllTodos(array $filters = [])
+    public function getAllTodos(array $filters = [], int $limit = 10, string $sort = 'created_at', string $order = 'desc')
     {
-        return $this->todoRepository->getAll($filters);
+        return $this->todoRepository->getAll($filters, $limit, $sort, $order);
     }
 
     public function getTodoById(int $id)
@@ -27,9 +29,9 @@ class TodoService
 
     public function createTodo(array $data)
     {
-        $this->validate($data);
-        return $this->todoRepository->create($data);
+        return Todo::create($data);
     }
+
 
     public function updateTodo(int $id, array $data)
     {
@@ -58,10 +60,9 @@ class TodoService
         $rules = [
             'title' => 'required|string|min:3|max:100',
             'description' => 'nullable|string|max:500',
-            'status' => 'required|in:pending,completed,in_progress',
+            'status' => 'required|in:pending,completed,in_progress,cancelled',
             'priority' => 'required|in:low,medium,high',
-            'due_date' => 'required|date|after:today',
-            'user_id' => 'required|exists:users,id',
+            'due_date' => 'nullable|date',
         ];
 
         $validator = Validator::make($data, $rules);

@@ -15,7 +15,7 @@ class StoreCategoryRequest extends FormRequest
     {
         return [
             'name' => 'required|string|max:100',
-            'color' => ['nullable', 'regex:/^#[A-Fa-f0-9]{6}$/'], // HEX renk kodu
+            'color' => ['nullable', 'regex:/^#[A-Fa-f0-9]{6}$/'], 
         ];
     }
 }

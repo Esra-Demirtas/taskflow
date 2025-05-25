@@ -5,7 +5,6 @@ namespace App\Http\Controllers;
 use App\Http\Controllers\Controller;
 use App\Services\CategoryService;
 use Illuminate\Http\Request;
-use App\Http\Resources\CategoryResource;
 use Illuminate\Validation\ValidationException;
 
 class CategoryController extends Controller

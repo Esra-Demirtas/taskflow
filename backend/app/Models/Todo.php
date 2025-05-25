@@ -3,8 +3,8 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Todo extends Model
 {
@@ -16,18 +16,16 @@ class Todo extends Model
         'status',
         'priority',
         'due_date',
-        'user_id'
+        'user_id',
     ];
 
-    // İlişki: Her todo bir kullanıcıya aittir
     public function user()
     {
         return $this->belongsTo(User::class);
     }
 
-    // İlişki: Her todo birçok kategoriye ait olabilir (many-to-many)
-    public function categories()
+    public function categories() 
     {
-        return $this->belongsToMany(Category::class, 'todo_category');
+        return $this->belongsToMany(Category::class, 'todo_category'); 
     }
 }
