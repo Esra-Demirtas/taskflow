@@ -25,26 +25,15 @@ class TodoController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $filters = $request->only(['status', 'priority', 'q']);
-        $limit = $request->get('limit', 10);
-        $sort = $request->get('sort', 'created_at');
-        $order = $request->get('order', 'desc');
+    $filters = $request->only(['status', 'priority', 'q']);
+    $limit = $request->get('limit', 10);
+    $sort = $request->get('sort', 'created_at');
+    $order = $request->get('order', 'desc');
 
-        $todos = $this->todoService->getAllTodos($filters, $limit, $sort, $order);
+    $todos = $this->todoService->getAllTodos($filters, $limit, $sort, $order);
 
-        return response()->json([
-            'status' => 'success',
-            'data' => $todos->items(), -
-            'pagination' => [
-                'total' => $todos->total(),
-                'per_page' => $todos->perPage(),
-                'current_page' => $todos->currentPage(),
-                'last_page' => $todos->lastPage(),
-                'from' => $todos->firstItem(),
-                'to' => $todos->lastItem(),
-            ],
-        ]);
-    }
+    return response()->json($todos); 
+}
 
     /**
      * Belirli bir todoyu ID'sine göre getirir.

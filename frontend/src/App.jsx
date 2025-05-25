@@ -12,14 +12,11 @@ function AppContent() {
   const location = useLocation();
   const { isAuthenticated, user, logout } = useAuth();
 
-  // Yan menünün gösterilmeyeceği yolları tanımlayın
   const noSidebarPaths = ['/login', '/register'];
-  // Mevcut yolun yan menü gerektiren bir yol olup olmadığını kontrol edin
   const showSidebar = !noSidebarPaths.includes(location.pathname);
 
   return (
-    // showSidebar durumuna göre sınıflandırmayı ayarlayın
-    <div className={`flex h-screen bg-gray-100 font-sans ${showSidebar ? '' : 'justify-center items-center'}`}>
+    <div className={`flex h-screen bg-gray-200 font-sans ${showSidebar ? '' : 'justify-center items-center'}`}>
 
       {/* Yan Menü (Sidebar) - Sadece showSidebar true ise render edilir */}
       {showSidebar && (
