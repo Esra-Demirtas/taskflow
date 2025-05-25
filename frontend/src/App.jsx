@@ -7,6 +7,10 @@ import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
+import NotFoundPage from './pages/NotFoundPage';
+import { ToastContainer } from 'react-toastify'; // Bu satır zaten var
+import 'react-toastify/dist/ReactToastify.css'; // Bu satır zaten var
+import TodoDetailPage from './pages/TodoDetailPage';
 
 function AppContent() {
   const location = useLocation();
@@ -16,6 +20,8 @@ function AppContent() {
   const showSidebar = !noSidebarPaths.includes(location.pathname);
 
   return (
+    // <ToastContainer />'ı ana div'in veya BrowserRouter'ın hemen içine ekleyin
+    // Genellikle en dıştaki elementin (burada ana div) kapanış etiketinden hemen önce eklenir.
     <div className={`flex h-screen bg-gray-200 font-sans ${showSidebar ? '' : 'justify-center items-center'}`}>
 
       {/* Yan Menü (Sidebar) - Sadece showSidebar true ise render edilir */}
@@ -130,6 +136,15 @@ function AppContent() {
               </ProtectedRoute>
             }
           />
+           {/* Todo Oluşturma Rotası - ID yok */}
+        <Route path="/todos/create" element={<ProtectedRoute><TodoDetailPage /></ProtectedRoute>} />
+
+        {/* Todo Detay Görüntüleme Rotası - Sadece göster */}
+        <Route path="/todos/detail/:id" element={<ProtectedRoute><TodoDetailPage /></ProtectedRoute>} />
+
+        {/* Todo Düzenleme Rotası - Formu göster */}
+        <Route path="/todos/edit/:id" element={<ProtectedRoute><TodoDetailPage /></ProtectedRoute>} />
+
           <Route
             path="/todos/category/:categoryId"
             element={
@@ -139,9 +154,13 @@ function AppContent() {
             }
           />
 
-          <Route path="*" element={<Navigate to={isAuthenticated ? "/dashboard" : "/login"} replace />} />
+          {/* NotFoundPage'i en sona ekliyoruz, böylece hiçbir rota eşleşmezse bu sayfa gösterilir. */}
+          <Route path="*" element={<NotFoundPage />} /> {/* Bu satırı ekleyin veya kontrol edin */}
         </Routes>
       </main>
+      
+      {/* ToastContainer'ı burada, ana div'in kapanışından hemen önce ekliyoruz */}
+      <ToastContainer position="bottom-right" autoClose={3000} hideProgressBar={false} newestOnTop={false} closeOnClick rtl={false} pauseOnFocusLoss draggable pauseOnHover />
     </div>
   );
 }

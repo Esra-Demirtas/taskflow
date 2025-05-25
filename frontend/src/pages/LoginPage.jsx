@@ -31,8 +31,9 @@ const LoginPage = () => {
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen "> {/* p-4 sm:p-6 lg:p-8 sınıfları kaldırıldı */}
-      <div className="bg-white p-8 sm:p-10 rounded-xl shadow-2xl w-full max-w-sm sm:max-w-md animate-fade-in">
+    <div className="flex items-center justify-center min-h-screen">
+      {/* FORM KUTUSU KAPSAYICISI - EŞİTLENMİŞ */}
+      <div className="bg-white p-8 rounded-xl shadow-2xl w-full max-w-md animate-fade-in"> 
         <h2 className="text-4xl font-extrabold text-center text-gray-800 mb-8 tracking-tight">
           Hoş Geldiniz!
         </h2>
@@ -62,6 +63,7 @@ const LoginPage = () => {
             <label htmlFor="email" className="block text-gray-700 text-sm font-medium mb-2">
               E-posta Adresi:
             </label>
+            {/* INPUT ALANI - EŞİTLENMİŞ */}
             <input
               type="email"
               id="email"
@@ -77,6 +79,7 @@ const LoginPage = () => {
             <label htmlFor="password" className="block text-gray-700 text-sm font-medium mb-2">
               Şifre:
             </label>
+            {/* INPUT ALANI - EŞİTLENMİŞ */}
             <input
               type="password"
               id="password"
@@ -89,6 +92,7 @@ const LoginPage = () => {
             />
           </div>
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+            {/* GİRİŞ YAP BUTONU - EŞİTLENMİŞ */}
             <button
               type="submit"
               className={`w-full sm:w-auto flex-grow bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 px-6 rounded-lg shadow-md transition transform duration-200 ease-in-out ${
@@ -124,10 +128,11 @@ const LoginPage = () => {
                 'Giriş Yap'
               )}
             </button>
+            {/* HESABIN YOK MU? KAYIT OL BUTONU - EŞİTLENMİŞ */}
             <button
               type="button"
               onClick={() => navigate('/register')}
-              className="w-full sm:w-auto text-center font-medium text-indigo-600 hover:text-indigo-800 transition duration-200 ease-in-out text-sm py-2 px-4 rounded-lg hover:bg-indigo-50"
+              className="w-full sm:w-auto text-center font-medium text-indigo-600 hover:text-indigo-800 transition duration-200 ease-in-out text-sm py-3 px-6 rounded-lg hover:bg-indigo-50"
             >
               Hesabın yok mu? Kayıt ol
             </button>

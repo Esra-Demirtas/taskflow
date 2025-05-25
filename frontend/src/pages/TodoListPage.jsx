@@ -1,277 +1,310 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
+import { useNavigate } from 'react-router-dom';
 import TodoForm from '../components/todo/TodoForm';
+import Modal from '../components/common/Modal'; // Modal bileşeninizin doğru yolu
+import { toast } from 'react-toastify';
 
 const API_BASE_URL = 'http://localhost:8000/api';
 
 const statusLabels = {
-  pending: 'Beklemede',
-  in_progress: 'Devam Ediyor',
-  completed: 'Tamamlandı',
-  cancelled: 'İptal',
+    pending: 'Beklemede',
+    in_progress: 'Devam Ediyor',
+    completed: 'Tamamlandı',
+    cancelled: 'İptal Edildi',
 };
 
 const priorityLabels = {
-  low: 'Düşük',
-  medium: 'Orta',
-  high: 'Yüksek',
+    low: 'Düşük',
+    medium: 'Orta',
+    high: 'Yüksek',
 };
 
 const TodoListPage = () => {
-  const [todos, setTodos] = useState([]);
-  const [page, setPage] = useState(1);
-  const [limit] = useState(10); 
-  const [totalPages, setTotalPages] = useState(1);
-  const [sort, setSort] = useState('created_at');
-  const [order, setOrder] = useState('desc');
-  const [filterStatus, setFilterStatus] = useState('');
-  const [filterPriority, setFilterPriority] = useState('');
-  const [searchTerm, setSearchTerm] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [showForm, setShowForm] = useState(false);
-  const [editTodo, setEditTodo] = useState(null);
+    const [todos, setTodos] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(1);
+    const [showModal, setShowModal] = useState(false); // TodoForm için modal
+    const [selectedTodo, setSelectedTodo] = useState(null); // Düzenlenecek todo
 
-const fetchTodos = async () => {
-  setLoading(true);
-  try {
-    const params = { page, limit, sort, order };
-    if (filterStatus) params.status = filterStatus;
-    if (filterPriority) params.priority = filterPriority;
-    if (searchTerm) params.q = searchTerm;
+    // Silme onayı için yeni state'ler
+    const [showConfirmModal, setShowConfirmModal] = useState(false); // Onay modalını göster/gizle
+    const [todoToDeleteId, setTodoToDeleteId] = useState(null);     // Silinecek todo'nun ID'si
 
-    const res = await axios.get(`${API_BASE_URL}/todos`, { params });
+    const navigate = useNavigate();
 
-    console.log('API Response:', res.data); 
+    const fetchTodos = useCallback(async (page = 1) => {
+        setLoading(true);
+        setError(null);
+        try {
+            const token = localStorage.getItem('token');
+            if (!token) {
+                navigate('/login');
+                return;
+            }
+            const response = await axios.get(`${API_BASE_URL}/todos?page=${page}`, {
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                },
+            });
+            // Backend'den gelen veriye göre uyarlayın. Örneğin Laravel API resource ile 'data' içinde gelebilir.
+            setTodos(response.data.data);
+            setTotalPages(response.data.last_page);
+            setCurrentPage(response.data.current_page);
+        } catch (err) {
+            console.error('Todolar çekilirken hata oluştu:', err);
+            if (err.response && err.response.status === 401) {
+                navigate('/login');
+            } else {
+                setError('Todolar yüklenirken bir hata oluştu.');
+            }
+        } finally {
+            setLoading(false);
+        }
+    }, [navigate]); // navigate hook'u bağımlılık olarak eklenmeli
 
-    setTodos(res.data.data); 
-    setTotalPages(res.data.pagination?.last_page || 1); 
-    setError('');
-  } catch (e) {
-    console.error("Todo listesi yüklenirken hata oluştu:", e);
-    setError('Todo listesi yüklenirken hata oluştu. Lütfen konsolu kontrol edin.');
-    setTodos([]);
-    setTotalPages(1); 
-  } finally {
-    setLoading(false);
-  }
-};
+    useEffect(() => {
+        fetchTodos();
+    }, [fetchTodos]);
 
-  useEffect(() => {
-    fetchTodos();
-  }, [page, limit, sort, order, filterStatus, filterPriority, searchTerm]);
+    const handleShowClick = (todoId) => {
+        // Bu buton sadece todonun detayını gösterecek sayfaya yönlendirme yapar.
+        navigate(`/todos/detail/${todoId}`); // '/todos/detail/:id' gibi bir rota kullanın.
+    };
 
-  const handleSearchChange = (e) => {
-    setSearchTerm(e.target.value);
-    setPage(1); 
-  };
+    const handleEditClick = (todo) => {
+        setSelectedTodo(todo);
+        setShowModal(true);
+    };
 
-  const handleSortChange = (field) => {
-    if (sort === field) {
-      setOrder(order === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSort(field);
-      setOrder('asc'); 
+    const handleCreateClick = () => {
+        setSelectedTodo(null); // Yeni todo için formu sıfırla
+        setShowModal(true);
+    };
+
+    const handleSaveTodo = () => { // TodoForm'dan dönüşte çağrılır
+        fetchTodos(currentPage); // Liste güncellendiği için todoları yeniden çek
+        setShowModal(false); // Modalı kapat
+    };
+
+    // Silme butonuna tıklandığında çağrılan fonksiyon (onay modalını açar)
+    const handleDeleteTodo = (todoId) => {
+        setTodoToDeleteId(todoId);      // Silinecek ID'yi sakla
+        setShowConfirmModal(true);      // Onay modalını göster
+    };
+
+    // Onay modalındaki "Evet, Sil" butonuna tıklandığında çağrılan fonksiyon
+    const confirmDeleteTodo = async () => {
+        // todoToDeleteId'nin geçerli olduğundan emin olalım
+        if (!todoToDeleteId) {
+            return;
+        }
+
+        try {
+            const token = localStorage.getItem('token');
+            const config = {
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                },
+            };
+            await axios.delete(`${API_BASE_URL}/todos/${todoToDeleteId}`, config);
+            setTodos(todos.filter((todo) => todo.id !== todoToDeleteId)); // State'ten sil
+            toast.success('Todo başarıyla silindi!');
+        } catch (error) {
+            console.error('Todo silinirken hata oluştu:', error);
+            const errorMessage = error.response?.data?.message || 'Todo silinirken bir hata oluştu.';
+            toast.error(errorMessage);
+        } finally {
+            setShowConfirmModal(false); // Onay modalını kapat
+            setTodoToDeleteId(null);    // Silinecek ID'yi sıfırla
+        }
+    };
+
+    const handleStatusChange = async (todoId, newStatus) => {
+        try {
+            const token = localStorage.getItem('token');
+            const config = {
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                },
+            };
+            const response = await axios.put(`${API_BASE_URL}/todos/${todoId}/status`, { status: newStatus }, config);
+
+            setTodos(todos.map(todo =>
+                todo.id === todoId ? { ...todo, status: response.data.data.status } : todo
+            ));
+            toast.success(`Todo durumu "${statusLabels[newStatus]}" olarak güncellendi!`);
+        } catch (error) {
+            console.error('Todo durumu güncellenirken hata oluştu:', error);
+            const errorMessage = error.response?.data?.message || 'Todo durumu güncellenirken bir hata oluştu.';
+            toast.error(errorMessage);
+        }
+    };
+
+    const handlePageChange = (page) => {
+        if (page > 0 && page <= totalPages) {
+            fetchTodos(page);
+        }
+    };
+
+    if (loading) {
+        return <div className="flex justify-center items-center h-screen text-lg">Yükleniyor...</div>;
     }
-  };
 
-  const handleEdit = (todo) => {
-    setEditTodo(todo);
-    setShowForm(true);
-  };
-
-  const handleDelete = async (id) => {
-    const confirmDelete = window.confirm('Bu todo silinsin mi?'); 
-    if (!confirmDelete) return;
-
-    try {
-      await axios.delete(`${API_BASE_URL}/todos/${id}`);
-      fetchTodos();
-    } catch (e) {
-      console.error("Silme işleminde hata oluştu:", e);
-      alert('Silme işleminde hata oluştu.');
+    if (error) {
+        return <div className="flex justify-center items-center h-screen text-red-500 text-lg">{error}</div>;
     }
-  };
 
-  const handleFormClose = () => {
-    setShowForm(false);
-    setEditTodo(null);
-  };
+    return (
+        <div className="p-6 bg-white rounded-lg shadow-md min-h-[calc(100vh-8rem)]">
+            <h1 className="text-3xl font-bold mb-6 text-gray-800">Yapılacaklar Listesi</h1>
 
-  const handleFormSubmit = async (todo) => {
-    try {
-      if (editTodo) {
-        await axios.put(`${API_BASE_URL}/todos/${editTodo.id}`, todo);
-      } else {
-        await axios.post(`${API_BASE_URL}/todos`, todo);
-      }
-      fetchTodos();
-    } catch (e) {
-      console.error("Kayıt sırasında hata oluştu:", e);
-      alert('Kayıt sırasında hata oluştu.'); 
-    } finally {
-      handleFormClose();
-    }
-  };
-
-  return (
-    <div className="p-6 bg-white rounded-lg shadow-md min-h-[calc(100vh-8rem)]">
-      <h1 className="text-4xl font-bold mb-6 text-gray-800">Yapılacaklar Listesi</h1>
-
-      <button
-        onClick={() => setShowForm(true)}
-        className="mb-6 px-6 py-3 bg-indigo-600 text-white rounded-lg shadow-md hover:bg-indigo-700 transition-all duration-200 transform hover:scale-105"
-      >
-        Yeni Todo Ekle
-      </button>
-
-      {/* Filtre ve Arama Bölümü */}
-      <div className="mb-6 flex flex-col sm:flex-row gap-4 items-center p-4 bg-gray-50 rounded-lg shadow-inner">
-        <select
-          value={filterStatus}
-          onChange={(e) => { setFilterStatus(e.target.value); setPage(1); }}
-          className="flex-1 w-full sm:w-auto border border-gray-300 p-2.5 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200"
-        >
-          <option value="">Durum Filtrele</option>
-          <option value="pending">Beklemede</option>
-          <option value="in_progress">Devam Ediyor</option>
-          <option value="completed">Tamamlandı</option>
-          <option value="cancelled">İptal</option>
-        </select>
-        <select
-          value={filterPriority}
-          onChange={(e) => { setFilterPriority(e.target.value); setPage(1); }}
-          className="flex-1 w-full sm:w-auto border border-gray-300 p-2.5 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200"
-        >
-          <option value="">Öncelik Filtrele</option>
-          <option value="low">Düşük</option>
-          <option value="medium">Orta</option>
-          <option value="high">Yüksek</option>
-        </select>
-        <input
-          type="text"
-          placeholder="Görev adına göre ara..."
-          value={searchTerm}
-          onChange={handleSearchChange}
-          className="flex-2 w-full sm:w-auto border border-gray-300 p-2.5 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200"
-        />
-      </div>
-
-      {/* Tablo */}
-      {loading ? (
-        <div className="text-center py-8 text-gray-600">Yükleniyor...</div>
-      ) : error ? (
-        <div className="text-red-600 text-center py-8">{error}</div>
-      ) : todos.length === 0 ? (
-        <div className="text-center py-8 text-gray-600">Gösterilecek todo bulunamadı.</div>
-      ) : (
-        <div className="overflow-x-auto rounded-lg shadow-lg border border-gray-200">
-          <table className="min-w-full bg-white">
-            <thead className="bg-gray-100 border-b border-gray-200">
-              <tr>
-                <th
-                  className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider cursor-pointer hover:bg-gray-200 transition-colors duration-200"
-                  onClick={() => handleSortChange('title')}
+            <div className="flex justify-between items-center mb-6">
+                <button
+                    onClick={handleCreateClick}
+                    className="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded transition duration-200"
                 >
-                  Görev Adı {sort === 'title' && (order === 'asc' ? '↑' : '↓')}
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Açıklama</th>
-                <th
-                  className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider cursor-pointer hover:bg-gray-200 transition-colors duration-200"
-                  onClick={() => handleSortChange('status')}
-                >
-                  Durum {sort === 'status' && (order === 'asc' ? '↑' : '↓')}
-                </th>
-                <th
-                  className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider cursor-pointer hover:bg-gray-200 transition-colors duration-200"
-                  onClick={() => handleSortChange('priority')}
-                >
-                  Öncelik {sort === 'priority' && (order === 'asc' ? '↑' : '↓')}
-                </th>
-                <th
-                  className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider cursor-pointer hover:bg-gray-200 transition-colors duration-200"
-                  onClick={() => handleSortChange('created_at')}
-                >
-                  Oluşturulma Tarihi {sort === 'created_at' && (order === 'asc' ? '↑' : '↓')}
-                </th>
-                <th
-                  className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider cursor-pointer hover:bg-gray-200 transition-colors duration-200"
-                  onClick={() => handleSortChange('due_date')}
-                >
-                  Bitiş Tarihi {sort === 'due_date' && (order === 'asc' ? '↑' : '↓')}
-                </th>
-                <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">İşlemler</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              {todos.map((todo) => (
-                <tr key={todo.id} className="hover:bg-gray-50 transition-colors duration-150">
-                  <td className="px-4 py-3 text-sm text-gray-900">{todo.title}</td>
-                  <td className="px-4 py-3 text-sm text-gray-700">{todo.description}</td>
-                  <td className="px-4 py-3 text-sm text-gray-700 capitalize">{statusLabels[todo.status] || todo.status}</td>
-                  <td className="px-4 py-3 text-sm text-gray-700 capitalize">{priorityLabels[todo.priority] || todo.priority}</td>
-                  <td className="px-4 py-3 text-sm text-gray-700">{new Date(todo.created_at).toLocaleDateString()}</td>
-                  <td className="px-4 py-3 text-sm text-gray-700">{todo.due_date ? new Date(todo.due_date).toLocaleDateString() : '-'}</td>
-                  <td className="px-4 py-3 text-center space-x-2">
+                    Yeni Todo Oluştur
+                </button>
+            </div>
+
+            {todos.length === 0 ? (
+                <p className="text-gray-600 text-center py-8">Henüz hiç todo bulunamadı.</p>
+            ) : (
+                <div className="overflow-x-auto">
+                    <table className="min-w-full bg-white border border-gray-200 rounded-lg">
+                        <thead className="bg-gray-100">
+                            <tr>
+                                <th className="py-3 px-4 border-b text-left text-sm font-semibold text-gray-600">Başlık</th>
+                                <th className="py-3 px-4 border-b text-left text-sm font-semibold text-gray-600">Açıklama</th>
+                                <th className="py-3 px-4 border-b text-left text-sm font-semibold text-gray-600">Durum</th>
+                                <th className="py-3 px-4 border-b text-left text-sm font-semibold text-gray-600">Öncelik</th>
+                                <th className="py-3 px-4 border-b text-left text-sm font-semibold text-gray-600">Bitiş Tarihi</th>
+                                <th className="py-3 px-4 border-b text-left text-sm font-semibold text-gray-600">Kategoriler</th>
+                                <th className="py-3 px-4 border-b text-left text-sm font-semibold text-gray-600">İşlemler</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {todos.map((todo) => (
+                                <tr key={todo.id} className="hover:bg-gray-50 transition duration-150 ease-in-out">
+                                    <td className="py-3 px-4 border-b text-sm text-gray-800 font-medium">{todo.title}</td>
+                                    <td className="py-3 px-4 border-b text-sm text-gray-600 max-w-xs truncate">{todo.description}</td>
+                                    <td className="py-3 px-4 border-b text-sm text-gray-600">{statusLabels[todo.status] || todo.status}</td>
+                                    <td className="py-3 px-4 border-b text-sm text-gray-600">{priorityLabels[todo.priority] || todo.priority}</td>
+                                    <td className="py-3 px-4 border-b text-sm text-gray-600">
+                                        {todo.due_date ? new Date(todo.due_date).toLocaleDateString('tr-TR') : 'Belirtilmedi'}
+                                    </td>
+                                    <td className="py-3 px-4 border-b text-sm text-gray-600">
+                                        {todo.categories && todo.categories.length > 0 ? (
+                                            <div className="flex flex-wrap gap-1">
+                                                {todo.categories.map(cat => (
+                                                    <span key={cat.id} className="bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-0.5 rounded-full">
+                                                        {cat.name}
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <span className="text-gray-400 italic">Yok</span>
+                                        )}
+                                    </td>
+                                    <td className="py-3 px-4 border-b text-sm text-gray-600">
+                                        <div className="flex space-x-2">
+                                            <button
+                                            onClick={() => handleShowClick(todo.id)}
+                                            className="px-3 py-1.5 bg-indigo-500 text-white rounded-md hover:bg-indigo-600 transition-colors duration-200 text-sm shadow-sm"
+                                        >
+                                            Göster
+                                        </button>
+                                            <button
+                                                onClick={() => handleEditClick(todo)}
+                                                className="bg-blue-500 hover:bg-blue-600 text-white py-1 px-3 rounded text-xs transition duration-200"
+                                            >
+                                                Düzenle
+                                            </button>
+                                            {/* Burası artık modalı açıyor */}
+                                            <button
+                                                onClick={() => handleDeleteTodo(todo.id)}
+                                                className="bg-red-500 hover:bg-red-600 text-white py-1 px-3 rounded text-xs transition duration-200"
+                                            >
+                                                Sil
+                                            </button>
+                                            
+                                        </div>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            )}
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+                <div className="flex justify-center mt-6 space-x-2">
                     <button
-                      onClick={() => handleEdit(todo)}
-                      className="px-3 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors duration-200 text-sm shadow-sm"
+                        onClick={() => handlePageChange(currentPage - 1)}
+                        disabled={currentPage === 1}
+                        className="px-4 py-2 bg-gray-200 rounded disabled:opacity-50"
                     >
-                      Düzenle
+                        Önceki
                     </button>
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                        <button
+                            key={page}
+                            onClick={() => handlePageChange(page)}
+                            className={`px-4 py-2 rounded ${currentPage === page ? 'bg-blue-500 text-white' : 'bg-gray-200 hover:bg-gray-300'}`}
+                        >
+                            {page}
+                        </button>
+                    ))}
                     <button
-                      onClick={() => handleDelete(todo.id)}
-                      className="px-3 py-1.5 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors duration-200 text-sm shadow-sm"
+                        onClick={() => handlePageChange(currentPage + 1)}
+                        disabled={currentPage === totalPages}
+                        className="px-4 py-2 bg-gray-200 rounded disabled:opacity-50"
                     >
-                      Sil
+                        Sonraki
                     </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+                </div>
+            )}
 
-      {/* Sayfalama */}
-      <div className="mt-6 flex justify-center items-center gap-3">
-        <button
-          onClick={() => setPage(prev => Math.max(prev - 1, 1))}
-          disabled={page === 1}
-          className="px-4 py-2 border border-gray-300 rounded-md bg-gray-50 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
-        >
-          Önceki
-        </button>
-        <span className="px-4 py-2 text-gray-700 font-medium">Sayfa {page} / {totalPages}</span>
-        <button
-          onClick={() => setPage(prev => Math.min(prev + 1, totalPages))}
-          disabled={page === totalPages}
-          className="px-4 py-2 border border-gray-300 rounded-md bg-gray-50 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
-        >
-          Sonraki
-        </button>
-      </div>
+            {/* Todo Form Modal (Düzenleme/Oluşturma) */}
+            {showModal && (
+                <Modal onClose={() => setShowModal(false)}>
+                    <TodoForm
+                        todo={selectedTodo} // Düzenleme modunda todo'yu gönderir
+                        onClose={() => setShowModal(false)} // Modalı kapatma işlevi
+                        onSave={handleSaveTodo} // Kaydedildikten sonra yapılacak işlev
+                    />
+                </Modal>
+            )}
 
-      {/* Todo Form Modal */}
-      {showForm && (
-        <div className="fixed inset-0 bg-black bg-opacity-60 flex justify-center items-center z-50 p-4">
-          <div className="bg-white p-8 rounded-lg shadow-xl w-full max-w-lg relative transform scale-95 animate-fade-in">
-            <button
-              onClick={handleFormClose}
-              className="absolute top-4 right-4 text-gray-500 hover:text-gray-800 text-2xl font-bold transition-colors duration-200"
-            >
-              &times;
-            </button>
-            <TodoForm
-              initialData={editTodo}
-              onSubmit={handleFormSubmit}
-              onCancel={handleFormClose}
-            />
-          </div>
+            {/* Silme Onayı Modalı */}
+            {showConfirmModal && (
+                <Modal onClose={() => setShowConfirmModal(false)}>
+                    <div className="p-6 text-center">
+                        <h3 className="text-xl font-semibold mb-4 text-gray-800">Silme Onayı</h3>
+                        <p className="mb-6 text-gray-700">Bu todoyu silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.</p>
+                        <div className="flex justify-center space-x-4">
+                            <button
+                                onClick={confirmDeleteTodo} // Onaylandıktan sonra silme işlemini başlatır
+                                className="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded transition duration-200"
+                            >
+                                Evet, Sil
+                            </button>
+                            <button
+                                onClick={() => setShowConfirmModal(false)} // Modalı kapatır
+                                className="bg-gray-400 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded transition duration-200"
+                            >
+                                İptal
+                            </button>
+                        </div>
+                    </div>
+                </Modal>
+            )}
         </div>
-      )}
-    </div>
-  );
+    );
 };
 
 export default TodoListPage;

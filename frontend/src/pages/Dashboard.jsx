@@ -40,7 +40,7 @@ const tagColors = {
   'Hata': 'bg-orange-500',
   'Dokümantasyon': 'bg-gray-500',
   'Düşük': 'bg-gray-500',    
-  'Orta': 'bg-yellow-600',   
+  'Orta': 'bg-yellow-600',  
   'Yüksek': 'bg-red-700',    
 };
 
@@ -98,7 +98,7 @@ function SortableItem({ todo }) {
  * @param {string} props.title 
  * @param {Array<object>} props.items 
  * @param {boolean} props.isLast 
- */
+*/
 function DroppableContainer({ id, children, title, items, isLast }) {
   const { setNodeRef, isOver } = useDroppable({
     id: id,
@@ -113,8 +113,8 @@ function DroppableContainer({ id, children, title, items, isLast }) {
       ref={setNodeRef} 
       id={id}
       className={`bg-white rounded-lg p-6 w-80 flex-shrink-0 min-h-[300px] shadow-lg border border-gray-200 
-                  ${isOver ? 'ring-2 ring-blue-500 ring-offset-2' : ''}
-                  ${!isLast ? 'border-r border-gray-300' : ''}`}
+                   ${isOver ? 'ring-2 ring-blue-500 ring-offset-2' : ''}
+                   ${!isLast ? 'border-r border-gray-300' : ''}`}
     >
       <h3 className="text-lg font-semibold mb-4 text-gray-700">{title}</h3>
       <SortableContext
@@ -137,7 +137,7 @@ function DroppableContainer({ id, children, title, items, isLast }) {
 /**
  * Ana Dashboard bileşeni.
  * Todo listesini, istatistikleri ve kanban panosunu görüntüler.
- */
+*/
 const Dashboard = () => {
   const [todosByStatus, setTodosByStatus] = useState({
     pending: [],
@@ -157,6 +157,7 @@ const Dashboard = () => {
 
   const [statusData, setStatusData] = useState([]);
   const [priorityData, setPriorityData] = useState([]);
+  const [upcomingTodos, setUpcomingTodos] = useState([]); 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [page, setPage] = useState(1);
@@ -243,6 +244,37 @@ const Dashboard = () => {
   };
 
   /**
+   * Yaklaşan bitiş tarihine sahip todoları filtreler (son 3 gün içinde ve bugün).
+   * @param {Array<object>} todos - Tüm todoların listesi.
+   * @returns {Array<object>} Son 3 gün içinde bitmesi gereken veya bugün bitmesi gereken todolar.
+   */
+  const getUpcomingTodos = (todos) => {
+    const now = new Date();
+    // Saat ve dakikayı sıfırlayarak sadece gün bazında karşılaştırma yapalım
+    now.setHours(0, 0, 0, 0); 
+    
+    const threeDaysLater = new Date();
+    threeDaysLater.setDate(now.getDate() + 3);
+    // threeDaysLater'ın da saatini gün sonuna ayarlayalım ki o günün tamamını kapsasın
+    threeDaysLater.setHours(23, 59, 59, 999);
+
+    return todos.filter(todo => {
+      // Sadece 'pending' veya 'in_progress' durumundakileri göster
+      if (!todo.due_date || (todo.status !== 'pending' && todo.status !== 'in_progress')) {
+        return false;
+      }
+      
+      const dueDate = new Date(todo.due_date);
+      dueDate.setHours(0, 0, 0, 0); // Bitiş tarihinin de saatini sıfırlayalım
+
+      // Bitiş tarihi bugüne eşit veya sonraki 3 gün içinde olanlar
+      // Ve bitiş tarihi 'threeDaysLater' (bugün + 3 günün sonu) tarihine eşit veya küçük olanlar
+      return dueDate >= now && dueDate <= threeDaysLater;
+    }).sort((a, b) => new Date(a.due_date) - new Date(b.due_date)); // Tarihe göre sırala
+  };
+
+
+  /**
    * Dashboard verilerini (todolar, kategoriler, istatistikler, grafikler) API'den çeker.
    * Bu fonksiyon ilk yüklemede veya tam bir senkronizasyon gerektiğinde çağrılır.
    */
@@ -256,7 +288,7 @@ const Dashboard = () => {
 
       const todos = (todosRes.data.data || todosRes.data).map(todo => ({
         ...todo,
-        tags: [getLocalizedPriority(todo.priority)],
+        tags: [getLocalizedPriority(todo.priority)], // Eğer Laravel'den etiket gelmiyorsa önceliği etiket olarak kullan
       }));
 
       const categories = categoriesRes.data.data || []; 
@@ -279,6 +311,7 @@ const Dashboard = () => {
 
       setStatusData(getTasksByStatus(todos)); 
       setPriorityData(getTasksByPriority(todos)); 
+      setUpcomingTodos(getUpcomingTodos(todos)); 
       setError(null); 
     } catch (err) {
       console.error(err);
@@ -292,6 +325,7 @@ const Dashboard = () => {
     fetchDashboardData();
   }, [fetchDashboardData]); 
 
+  // Kanban panosu güncellemesinde istatistikleri ve grafikleri güncelle
   useEffect(() => {
     const allTodos = Object.values(todosByStatus).flat(); 
 
@@ -311,7 +345,7 @@ const Dashboard = () => {
 
     setStatusData(getTasksByStatus(allTodos));
     setPriorityData(getTasksByPriority(allTodos));
-
+    setUpcomingTodos(getUpcomingTodos(allTodos)); 
   }, [todosByStatus]); 
 
   const sensors = useSensors(
@@ -443,7 +477,7 @@ const Dashboard = () => {
 
   return (
     <div className="p-6 bg-white rounded-lg shadow-md min-h-[calc(100vh-8rem)]">
-      <h1 className="text-4xl font-bold mb-8 text-gray-800">Ana Sayfa Dashboard</h1>
+      <h1 className="text-4xl font-bold mb-8 text-gray-800">Ana Sayfa</h1>
 
       {loading && <p className="text-center text-gray-600">Yükleniyor...</p>}
       {error && <p className="text-red-600 text-center">{error}</p>}
@@ -470,7 +504,7 @@ const Dashboard = () => {
           {/* Grafik bölümü */}
           <section className="mb-12 grid grid-cols-1 md:grid-cols-2 gap-8">
             <div className="bg-white rounded shadow p-4 border border-gray-200">
-              <h2 className="text-2xl font-semibold mb-4 text-gray-700">Todo Statüleri</h2>
+              <h2 className="text-2xl font-semibold mb-4 text-gray-700">Yapılacaklar Listesi Durum</h2>
               <ResponsiveContainer width="100%" height={300}>
                 <BarChart
                   data={statusData}
@@ -486,7 +520,7 @@ const Dashboard = () => {
             </div>
 
             <div className="bg-white rounded shadow p-4 border border-gray-200">
-              <h2 className="text-2xl font-semibold mb-4 text-gray-700">Todo Öncelikleri</h2>
+              <h2 className="text-2xl font-semibold mb-4 text-gray-700">Yapılacaklar Listesi Öncelik</h2>
               <ResponsiveContainer width="100%" height={300}>
                 <BarChart
                   data={priorityData}
@@ -503,8 +537,11 @@ const Dashboard = () => {
           </section>
 
           {/* Kanban panosu bölümü */}
-          <section>
-            <h2 className="text-2xl font-semibold mb-4 text-gray-700">Todo Kanban</h2>
+          <section className="mb-12"> 
+            <h2 className="text-2xl font-semibold mb-4 text-gray-700">Yapılacaklar Listesi (Kanban)</h2>
+            <p className="text-sm text-red-500 italic mb-4">
+              *Sürükle Bırak ile durumu değiştirebilirsiniz.
+            </p>
             <DndContext
               sensors={sensors}
               collisionDetection={closestCenter}
@@ -537,6 +574,47 @@ const Dashboard = () => {
               </DragOverlay>
             </DndContext>
           </section>
+
+          {/* Yaklaşan Bitiş Tarihleri Listesi - YENİ EKLENEN BÖLÜM (Liste Olarak) */}
+          <section className="mb-8">
+            <h2 className="text-2xl font-semibold mb-4 text-gray-700">Yaklaşan Bitiş Tarihleri (Son 3 Gün)</h2>
+            {upcomingTodos.length > 0 ? (
+              <ul className="divide-y divide-gray-200 border border-gray-200 rounded-lg shadow-sm bg-white">
+                {upcomingTodos.map(todo => (
+                  <li key={todo.id} className="p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between hover:bg-gray-50 transition duration-150 ease-in-out">
+                    <div className="mb-2 sm:mb-0">
+                      <p className="font-semibold text-lg text-gray-800">{todo.title}</p>
+                      {todo.description && (
+                         <p className="text-sm text-gray-600 truncate max-w-lg">{todo.description}</p>
+                      )}
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2 sm:gap-4 sm:ml-4 flex-shrink-0">
+                      <p className="text-sm text-gray-500">
+                        Bitiş: <span className="font-medium text-yellow-700">{new Date(todo.due_date).toLocaleDateString('tr-TR')}</span>
+                      </p>
+                      {todo.tags && todo.tags.length > 0 && (
+                        <div className="flex flex-wrap gap-1">
+                          {todo.tags.map((tag, index) => (
+                            <span
+                              key={index}
+                              className={`px-2 py-0.5 rounded-full text-xs text-white ${tagColors[tag] || 'bg-gray-400'}`}
+                            >
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-gray-600 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                Son 3 gün içinde bitmesi gereken bir todo bulunmuyor.
+              </p>
+            )}
+          </section>
+
         </>
       )}
     </div>
