@@ -12,6 +12,14 @@
 - Responsive tasarım
 - Gerçek zamanlı veri güncelleme
 - ORM Kullanımı: Eloquent
+- CORS konfigürasyonu
+- Repository Pattern
+- Service Layer
+- Middleware
+- State Yönetimi (Context API)
+- Routing: React Router v6+
+- HTTP İstekleri: Axios
+- Validasyon
 - Migrasyon Scriptleri
 - Seed Data
 - OOP prensipleri uygun
