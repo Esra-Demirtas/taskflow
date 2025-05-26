@@ -7,6 +7,9 @@ const LoginPage = () => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  // Şifre görünürlüğünü kontrol etmek için yeni state
+  const [showPassword, setShowPassword] = useState(false); // Yeni eklendi
+
   const { login } = useAuth();
   const navigate = useNavigate();
 
@@ -32,7 +35,6 @@ const LoginPage = () => {
 
   return (
     <div className="flex items-center justify-center min-h-screen">
-      {/* FORM KUTUSU KAPSAYICISI - EŞİTLENMİŞ */}
       <div className="bg-white p-8 rounded-xl shadow-2xl w-full max-w-md animate-fade-in"> 
         <h2 className="text-4xl font-extrabold text-center text-gray-800 mb-8 tracking-tight">
           Hoş Geldiniz!
@@ -63,7 +65,6 @@ const LoginPage = () => {
             <label htmlFor="email" className="block text-gray-700 text-sm font-medium mb-2">
               E-posta Adresi:
             </label>
-            {/* INPUT ALANI - EŞİTLENMİŞ */}
             <input
               type="email"
               id="email"
@@ -75,24 +76,29 @@ const LoginPage = () => {
               autoComplete="email"
             />
           </div>
-          <div className="mb-6">
+          {/* Şifre alanı için değişiklik */}
+          <div className="mb-6 relative"> {/* relative ekledik */}
             <label htmlFor="password" className="block text-gray-700 text-sm font-medium mb-2">
               Şifre:
             </label>
-            {/* INPUT ALANI - EŞİTLENMİŞ */}
             <input
-              type="password"
+              type={showPassword ? "text" : "password"} 
               id="password"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition duration-200 ease-in-out placeholder-gray-400"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition duration-200 ease-in-out placeholder-gray-400 pr-10" /* pr-10 ekledik */
               placeholder="Şifrenizi girin"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
               autoComplete="current-password"
             />
+            <span 
+              className="absolute inset-y-0 right-0 pr-3 flex items-center pt-8 cursor-pointer" /* absolute ve flex ekledik */
+              onClick={() => setShowPassword(!showPassword)}
+            >
+              {showPassword ? '🙈' : '👁️'} {/* Emoji değişimi */}
+            </span>
           </div>
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-            {/* GİRİŞ YAP BUTONU - EŞİTLENMİŞ */}
             <button
               type="submit"
               className={`w-full sm:w-auto flex-grow bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 px-6 rounded-lg shadow-md transition transform duration-200 ease-in-out ${
@@ -128,7 +134,6 @@ const LoginPage = () => {
                 'Giriş Yap'
               )}
             </button>
-            {/* HESABIN YOK MU? KAYIT OL BUTONU - EŞİTLENMİŞ */}
             <button
               type="button"
               onClick={() => navigate('/register')}
