@@ -12,12 +12,7 @@ class TodoService
     {
         $query = Todo::with('categories', 'user');
 
-        if (isset($filters['status'])) {
-            $query->where('status', $filters['status']);
-        }
-        if (isset($filters['priority'])) {
-            $query->where('priority', $filters['priority']);
-        }
+        // 'q' filtresi (arama terimi) burada da zaten uygulanmış durumda
         if (isset($filters['q'])) {
             $query->where(function ($q) use ($filters) {
                 $q->where('title', 'like', '%' . $filters['q'] . '%')
@@ -25,15 +20,19 @@ class TodoService
             });
         }
 
+        if (isset($filters['status'])) {
+            $query->where('status', $filters['status']);
+        }
+        if (isset($filters['priority'])) {
+            $query->where('priority', $filters['priority']);
+        }
+       
+        // Limit zaten dışarıdan geliyor, paginate fonksiyonuna aktarılıyor
         return $query->orderBy($sort, $order)->paginate($limit);
     }
 
     public function getTodoById(int $id): ?Todo
     {
-        // Eloquent'in find() metodu zaten doğrudan modeli veya null döndürür.
-        // Ancak statik analiz aracının Builder döndürdüğünü belirtmesi durumunda,
-        // where() ve first() kombinasyonu daha açık olabilir.
-        // Normalde Todo::find($id) yeterlidir.
         return Todo::with('categories', 'user')->where('id', $id)->first();
     }
 
@@ -48,11 +47,9 @@ class TodoService
 
     public function updateTodo(int $id, array $data): ?Todo
     {
-        /** @var \App\Models\Todo|null $todo */ // Intelephense için tip ipucu
+        /** @var \App\Models\Todo|null $todo */
         $todo = Todo::find($id);
         if ($todo) {
-            // update() metodu boolean döndürür, ancak biz güncellediğimiz $todo nesnesini döndürüyoruz.
-            // Statik analiz aracının kafasını karıştırmamak için bu satırın sonucu doğrudan kullanılmaz.
             $todo->update($data);
             if (array_key_exists('category_ids', $data)) {
                 if ($data['category_ids'] === null || count($data['category_ids']) === 0) {
@@ -68,10 +65,9 @@ class TodoService
 
     public function updateStatus(int $id, string $status): ?Todo
     {
-        /** @var \App\Models\Todo|null $todo */ // Intelephense için tip ipucu
+        /** @var \App\Models\Todo|null $todo */
         $todo = Todo::find($id);
         if ($todo) {
-            // update() metodu boolean döndürür, ancak biz güncellediğimiz $todo nesnesini döndürüyoruz.
             $todo->update(['status' => $status]);
             return $todo->load('categories', 'user');
         }
@@ -87,12 +83,19 @@ class TodoService
         return false;
     }
 
-    public function searchTodos(string $query): LengthAwarePaginator
+    /**
+     * Todolar arasında arama yapar ve sayfalı sonuç döndürür.
+     *
+     * @param string $query Arama sorgusu
+     * @param int $limit Sayfalama limiti
+     * @return \Illuminate\Pagination\LengthAwarePaginator
+     */
+    public function searchTodos(string $query, int $limit = 10): LengthAwarePaginator
     {
         return Todo::with('categories', 'user')
             ->where('title', 'like', '%' . $query . '%')
             ->orWhere('description', 'like', '%' . $query . '%')
-            ->paginate(10); // Varsayılan sayfalama
+            ->paginate($limit); // Limit doğrudan buradan alınabilir veya controller'dan gönderilebilir
     }
 
     /**

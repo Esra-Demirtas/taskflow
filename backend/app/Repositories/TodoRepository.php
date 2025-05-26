@@ -4,7 +4,7 @@ namespace App\Repositories;
 
 use App\Models\Todo;
 use Illuminate\Pagination\LengthAwarePaginator;
-use Illuminate\Database\Eloquent\Collection; // Laravel koleksiyonları için
+use Illuminate\Database\Eloquent\Collection;
 
 class TodoRepository
 {
@@ -27,9 +27,7 @@ class TodoRepository
      */
     public function getAll(array $filters = [], int $limit = 10, string $sort = 'created_at', string $order = 'desc'): LengthAwarePaginator
     {
-        $query = $this->model->newQuery();
-
-        $query->with('categories');
+        $query = $this->model->newQuery()->with('categories');
 
         if (isset($filters['status'])) {
             $query->where('status', $filters['status']);
@@ -57,15 +55,13 @@ class TodoRepository
      * @return \App\Models\Todo|null
      */
     public function findById($id): ?Todo
-{
-    return Todo::where('id', $id)->first(); // Bu Todo|null döner
-}
+    {
+        return $this->model->with('categories')->where('id', $id)->first();
+    }
 
 
     /**
      * Yeni bir todo oluşturur.
-     * Bu metot genellikle sadece todo'nun ana verilerini oluşturur, pivot tablo ilişkilerini değil.
-     * İlişkilendirme Controller'da veya Service'de yapılabilir.
      *
      * @param array $data Oluşturulacak todo verileri
      * @return \App\Models\Todo
@@ -77,8 +73,6 @@ class TodoRepository
 
     /**
      * Mevcut bir todoyu günceller.
-     * Bu metot genellikle sadece todo'nun ana verilerini günceller, pivot tablo ilişkilerini değil.
-     * İlişkilendirme Controller'da veya Service'de yapılabilir.
      *
      * @param int $id Güncellenecek todo ID'si
      * @param array $data Güncelleme verileri
@@ -87,12 +81,12 @@ class TodoRepository
     public function update(int $id, array $data): ?Todo
     {
         /** @var Todo|null $todo */
-        $todo = Todo::find($id);
+        $todo = $this->model->find($id);
 
         if ($todo) {
             $todo->update($data);
         }
-        return $todo; // Eğer bulunamazsa null, bulunursa güncellenmiş model döner
+        return $todo;
     }
 
     /**
@@ -105,12 +99,12 @@ class TodoRepository
     public function updateStatus(int $id, string $status): ?Todo
     {
         /** @var Todo|null $todo */
-        $todo = Todo::find($id);
+        $todo = $this->model->find($id);
 
         if ($todo) {
             $todo->update(['status' => $status]);
         }
-        return $todo; // Eğer bulunamazsa null, bulunursa güncellenmiş model döner
+        return $todo;
     }
 
     /**
@@ -121,7 +115,6 @@ class TodoRepository
      */
     public function delete(int $id): bool
     {
-        // destroy metodu, model bulunamazsa 0, silinirse 1 döndürür. (bool) ile cast ediyoruz.
         return (bool) $this->model->destroy($id);
     }
 
@@ -130,14 +123,15 @@ class TodoRepository
      * Kategorileri eager load eder.
      *
      * @param string $query Arama sorgusu
+     * @param int $limit Sayfalama limiti
      * @return \Illuminate\Pagination\LengthAwarePaginator
      */
-    public function search(string $query): LengthAwarePaginator
+    public function search(string $query, int $limit = 10): LengthAwarePaginator
     {
         return $this->model->newQuery()
             ->with('categories')
             ->where('title', 'like', '%' . $query . '%')
             ->orWhere('description', 'like', '%' . $query . '%')
-            ->paginate(10);
+            ->paginate($limit);
     }
 }

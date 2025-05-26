@@ -31,6 +31,7 @@ const TodoListPage = () => {
 
     const [filterStatus, setFilterStatus] = useState('');
     const [filterPriority, setFilterPriority] = useState('');
+    const [searchQuery, setSearchQuery] = useState(''); // Yeni: Arama terimi state'i
 
     const [sortBy, setSortBy] = useState('created_at'); // Varsayılan sıralama alanı
     const [sortDirection, setSortDirection] = useState('desc'); // Varsayılan sıralama yönü
@@ -40,7 +41,8 @@ const TodoListPage = () => {
 
     const navigate = useNavigate();
 
-    const fetchTodos = useCallback(async (page = 1) => {
+    // fetchTodos fonksiyonunu search parametresi alacak şekilde güncelledik
+    const fetchTodos = useCallback(async (page = 1, query = searchQuery) => {
         setLoading(true);
         setError(null);
         try {
@@ -50,12 +52,16 @@ const TodoListPage = () => {
                 return;
             }
 
-            const params = new URLSearchParams({ page, per_page: 10 }); // per_page ekledik
+            // URLSearchParams objesi ile parametreleri daha düzenli yönetin
+            const params = new URLSearchParams({ page, limit: 10 }); // 'per_page' yerine 'limit' kullandık
             if (filterStatus) {
                 params.append('status', filterStatus);
             }
             if (filterPriority) {
                 params.append('priority', filterPriority);
+            }
+            if (query) { // Arama terimi varsa params'a ekle
+                params.append('q', query);
             }
             params.append('sort', sortBy);
             params.append('order', sortDirection);
@@ -68,9 +74,13 @@ const TodoListPage = () => {
             });
 
             console.log('API Response:', response.data); // Debugging için
+
+            // API yanıtındaki sayfalama verilerine doğru şekilde erişin
+            // Backend'den gelen yanıta göre düzenleme
             setTodos(response.data.data);
             setTotalPages(response.data.last_page);
             setCurrentPage(response.data.current_page);
+
         } catch (err) {
             console.error('Todolar çekilirken hata oluştu:', err);
             if (err.response && err.response.status === 401) {
@@ -81,17 +91,15 @@ const TodoListPage = () => {
         } finally {
             setLoading(false);
         }
-    }, [navigate, filterStatus, filterPriority, sortBy, sortDirection]);
+    }, [navigate, filterStatus, filterPriority, sortBy, sortDirection, searchQuery]); // searchQuery'yi dependency olarak ekle
 
+    // Filter, sort veya search değiştiğinde sayfayı 1'e sıfırla ve yeniden çek
     useEffect(() => {
-        fetchTodos();
-    }, [fetchTodos]);
-
-    // Filtreleme veya sıralama değiştiğinde sayfayı 1'e sıfırla ve yeniden todoları çek
-    useEffect(() => {
-        setCurrentPage(1);
-        fetchTodos(1);
-    }, [filterStatus, filterPriority, sortBy, sortDirection]);
+        // Sadece ilk renderda fetchTodos'u çağır, diğerleri dependency değiştiğinde tetiklenecek
+        // veya manuel olarak Ara butonuna basıldığında tetiklenecek.
+        // setCurrentPage(1); // Bu satırı kaldırdık, çünkü handleSearch ve filtre değişiklikleri zaten 1. sayfaya sıfırlıyor
+        fetchTodos(1, searchQuery); // İlk yüklemede ve dependency değişiminde todoları çek
+    }, [fetchTodos, filterStatus, filterPriority, sortBy, sortDirection, searchQuery]); // searchQuery'yi dependency olarak ekle
 
     const handleShowClick = (todoId) => {
         navigate(`/todos/detail/${todoId}`);
@@ -108,7 +116,7 @@ const TodoListPage = () => {
     };
 
     const handleSaveTodo = () => {
-        fetchTodos(currentPage);
+        fetchTodos(currentPage, searchQuery); // Kaydetme sonrası mevcut sayfayı ve arama terimini koru
         setShowModal(false);
     };
 
@@ -132,7 +140,7 @@ const TodoListPage = () => {
             await axios.delete(`${API_BASE_URL}/todos/${todoToDeleteId}`, config);
             toast.success('Todo başarıyla silindi!');
             // Silme işlemi sonrası güncel sayfadaki todoları yeniden çek
-            fetchTodos(currentPage);
+            fetchTodos(currentPage, searchQuery); // Silme sonrası mevcut arama terimini de gönder
         } catch (error) {
             console.error('Todo silinirken hata oluştu:', error);
             const errorMessage = error.response?.data?.message || 'Todo silinirken bir hata oluştu.';
@@ -164,10 +172,11 @@ const TodoListPage = () => {
         }
     };
 
+    // Sayfa değiştiğinde fetchTodos'u mevcut arama terimiyle çağır
     const handlePageChange = (page) => {
         if (page > 0 && page <= totalPages) {
-            setCurrentPage(page); // Sayfayı güncelle
-            fetchTodos(page); // Yeni sayfayı çek
+            setCurrentPage(page);
+            fetchTodos(page, searchQuery);
         }
     };
 
@@ -196,7 +205,7 @@ const TodoListPage = () => {
                 </button>
             </div>
 
-            {/* Filtreleme alanı */}
+            {/* Filtreleme ve Arama alanı */}
             <div className="flex flex-wrap gap-4 mb-6 items-center">
                 <div className="flex items-center gap-2">
                     <label htmlFor="statusFilter" className="text-gray-700 font-medium">Durum:</label>
@@ -227,12 +236,42 @@ const TodoListPage = () => {
                         ))}
                     </select>
                 </div>
+
+                {/* Arama Kutusu */}
+                <div className="flex items-center gap-2">
+                    <label htmlFor="search" className="sr-only">Ara:</label> {/* Ekran okuyucular için, görsel olarak gizli */}
+                    <div className="relative flex w-full max-w-sm"> {/* Input ve butonu saran div */}
+                        <input
+                            type="text"
+                            id="search"
+                            className="p-2 border border-gray-300 rounded-l-md focus:outline-none focus:ring-2 focus:ring-blue-500 flex-grow" /* rounded-l-md ve flex-grow ekledik */
+                            placeholder="Başlık veya açıklama ara..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            onKeyPress={(e) => {
+                                if (e.key === 'Enter') {
+                                    setCurrentPage(1);
+                                    fetchTodos(1, searchQuery);
+                                }
+                            }}
+                        />
+                        <button
+                            onClick={() => {
+                                setCurrentPage(1);
+                                fetchTodos(1, searchQuery);
+                            }}
+                            className="bg-purple-500 hover:bg-purple-600 text-white font-bold py-2 px-4 rounded-r-md transition duration-200 focus:outline-none focus:ring-2 focus:ring-purple-500" /* rounded-r-md ekledik */
+                        >
+                            Ara
+                        </button>
+                    </div>
+                </div>
             </div>
 
             {loading ? (
                 <div className="flex justify-center items-center py-8 text-gray-600">Veriler yükleniyor...</div>
             ) : todos.length === 0 ? (
-                <p className="text-gray-600 text-center py-8">Henüz hiç todo bulunamadı.</p>
+                <p className="text-gray-600 text-center py-8">Todo bulunamadı.</p>
             ) : (
                 <div className="overflow-x-auto">
                     <table className="min-w-full bg-white border border-gray-200 rounded-lg">
@@ -256,7 +295,7 @@ const TodoListPage = () => {
                                             <span className="ml-1 text-xs">
                                                 {sortBy === column && sortDirection === 'asc' && '↑'}
                                                 {sortBy === column && sortDirection === 'desc' && '↓'}
-                                                {sortBy !== column && '↕'} {/* Varsayılan olarak göster */}
+                                                {sortBy !== column && '↕'}
                                             </span>
                                         </div>
                                     </th>

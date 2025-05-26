@@ -5,19 +5,19 @@ namespace App\Http\Controllers;
 use App\Http\Controllers\Controller;
 use App\Services\TodoService;
 use Illuminate\Http\Request;
-use Illuminate\Http\JsonResponse; // JsonResponse tip bildirimi için
-use Illuminate\Validation\ValidationException; // Bu artık Handler tarafından yakalanacak, manuel try-catch'e gerek kalmayacak
-use Illuminate\Support\Facades\Log; // Loglama için
+use Illuminate\Http\JsonResponse;
+use Illuminate\Validation\ValidationException;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Auth;
-use App\Models\Todo; // ModelNotFoundException için
-use App\Models\Category; // İlişkiler için
+use App\Models\Todo;
+use App\Models\Category;
 
-use App\Traits\ApiResponse; // <-- Bu satırı ekleyin
-use Symfony\Component\HttpFoundation\Response; // <-- HTTP durum kodları için bu satırı ekleyin
+use App\Traits\ApiResponse;
+use Symfony\Component\HttpFoundation\Response;
 
 class TodoController extends Controller
 {
-    use ApiResponse; // <-- Bu satırı ekleyin
+    use ApiResponse;
 
     protected $todoService;
 
@@ -32,18 +32,18 @@ class TodoController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
+        // 'q' filtresini de request'ten alıyoruz
         $filters = $request->only(['status', 'priority', 'q']);
-        $limit = $request->get('limit', 10);
+        $limit = $request->get('limit', 10); // Varsayılan limit 10
         $sort = $request->get('sort', 'created_at');
         $order = $request->get('order', 'desc');
 
         $todos = $this->todoService->getAllTodos($filters, $limit, $sort, $order);
 
-        // API Response Trait'ini kullanarak başarılı yanıt döndür
         return $this->successResponse(
             'Todolar başarıyla listelendi.',
-            $todos->items(), // Sayfalama verilerini ayırıp sadece öğeleri gönderiyoruz
-            Response::HTTP_OK, // 200 OK
+            $todos->items(),
+            Response::HTTP_OK,
             [
                 'pagination' => [
                     'total'        => $todos->total(),
@@ -52,6 +52,8 @@ class TodoController extends Controller
                     'last_page'    => $todos->lastPage(),
                     'from'         => $todos->firstItem(),
                     'to'           => $todos->lastItem(),
+                    'next_page_url'=> $todos->nextPageUrl(), // Sonraki sayfa URL'si
+                    'prev_page_url'=> $todos->previousPageUrl(), // Önceki sayfa URL'si
                 ]
             ]
         );
@@ -65,16 +67,13 @@ class TodoController extends Controller
         $todo = $this->todoService->getTodoById($id);
 
         if (!$todo) {
-            // Kaynak bulunamadığında ModelNotFoundException fırlatıyoruz.
-            // Bu istisna Handler.php tarafından yakalanacak ve 404 döndürecek.
             throw new \Illuminate\Database\Eloquent\ModelNotFoundException('Todo bulunamadı.');
         }
 
-        // API Response Trait'ini kullanarak başarılı yanıt döndür
         return $this->successResponse(
             'Todo detayları getirildi.',
             $todo,
-            Response::HTTP_OK // 200 OK
+            Response::HTTP_OK
         );
     }
 
@@ -83,7 +82,6 @@ class TodoController extends Controller
      */
     public function store(Request $request): JsonResponse
     {
-        // ValidationException artık Handler.php tarafından yakalanacak, try-catch bloğuna gerek yok.
         $validatedData = $request->validate([
             'title' => 'required|string|min:3|max:100',
             'description' => 'nullable|string|max:500',
@@ -104,11 +102,10 @@ class TodoController extends Controller
 
         $todo->load('categories');
 
-        // API Response Trait'ini kullanarak başarılı yanıt döndür
         return $this->successResponse(
             'Todo başarıyla oluşturuldu.',
             $todo,
-            Response::HTTP_CREATED // 201 Created
+            Response::HTTP_CREATED
         );
     }
 
@@ -117,7 +114,6 @@ class TodoController extends Controller
      */
     public function update(Request $request, $id): JsonResponse
     {
-        // ValidationException artık Handler.php tarafından yakalanacak, try-catch bloğuna gerek yok.
         $validatedData = $request->validate([
             'title' => 'sometimes|required|string|min:3|max:100',
             'description' => 'nullable|string|max:500',
@@ -131,8 +127,6 @@ class TodoController extends Controller
         $todo = $this->todoService->updateTodo($id, $validatedData);
 
         if (!$todo) {
-            // Kaynak bulunamadığında ModelNotFoundException fırlatıyoruz.
-            // Bu istisna Handler.php tarafından yakalanacak ve 404 döndürecek.
             throw new \Illuminate\Database\Eloquent\ModelNotFoundException('Güncellenecek todo bulunamadı.');
         }
 
@@ -146,11 +140,10 @@ class TodoController extends Controller
 
         $todo->load('categories');
 
-        // API Response Trait'ini kullanarak başarılı yanıt döndür
         return $this->successResponse(
             'Todo başarıyla güncellendi.',
             $todo,
-            Response::HTTP_OK // 200 OK
+            Response::HTTP_OK
         );
     }
 
@@ -166,18 +159,15 @@ class TodoController extends Controller
         $todo = $this->todoService->updateStatus($id, $request->status);
 
         if (!$todo) {
-            // Kaynak bulunamadığında ModelNotFoundException fırlatıyoruz.
-            // Bu istisna Handler.php tarafından yakalanacak ve 404 döndürecek.
             throw new \Illuminate\Database\Eloquent\ModelNotFoundException('Durumu güncellenecek todo bulunamadı.');
         }
 
         $todo->load('categories');
 
-        // API Response Trait'ini kullanarak başarılı yanıt döndür
         return $this->successResponse(
             'Todo durumu başarıyla güncellendi.',
             $todo,
-            Response::HTTP_OK // 200 OK
+            Response::HTTP_OK
         );
     }
 
@@ -189,42 +179,38 @@ class TodoController extends Controller
         $deleted = $this->todoService->deleteTodo($id);
 
         if (!$deleted) {
-            // Kaynak bulunamadığında ModelNotFoundException fırlatıyoruz.
-            // Bu istisna Handler.php tarafından yakalanacak ve 404 döndürecek.
             throw new \Illuminate\Database\Eloquent\ModelNotFoundException('Silinecek todo bulunamadı.');
         }
 
-        // API Response Trait'ini kullanarak başarılı yanıt döndür
         return $this->successResponse(
             'Todo başarıyla silindi.',
-            null, // Silme işleminde genellikle data dönülmez
-            Response::HTTP_NO_CONTENT // 204 No Content
+            null,
+            Response::HTTP_NO_CONTENT
         );
     }
 
     /**
-     * Todolar arasında arama yapar.
+     * Todolar arasında arama yapar ve sayfalı sonuç döndürür.
      */
     public function search(Request $request): JsonResponse
     {
         $q = $request->query('q');
+        $limit = $request->get('limit', 10); // Arama sonuçları için de sayfalama limiti
 
         if (!$q) {
-            // Geçersiz istek durumunda (arama terimi yoksa) manuel hata dönüyoruz.
-            // Bu tür basit validasyonlar için trait'teki errorResponse kullanılabilir.
             return $this->errorResponse(
                 'Arama terimi belirtilmelidir.',
-                Response::HTTP_BAD_REQUEST // 400 Bad Request
+                Response::HTTP_BAD_REQUEST
             );
         }
 
-        $results = $this->todoService->searchTodos($q);
+        // searchTodos metoduna limiti de gönderiyoruz
+        $results = $this->todoService->searchTodos($q, $limit);
 
-        // API Response Trait'ini kullanarak başarılı yanıt döndür
         return $this->successResponse(
             'Arama sonuçları başarıyla listelendi.',
-            $results->items(), // Sayfalama verilerini ayırıp sadece öğeleri gönderiyoruz
-            Response::HTTP_OK, // 200 OK
+            $results->items(),
+            Response::HTTP_OK,
             [
                 'pagination' => [
                     'total'        => $results->total(),
@@ -233,6 +219,8 @@ class TodoController extends Controller
                     'last_page'    => $results->lastPage(),
                     'from'         => $results->firstItem(),
                     'to'           => $results->lastItem(),
+                    'next_page_url'=> $results->nextPageUrl(),
+                    'prev_page_url'=> $results->previousPageUrl(),
                 ]
             ]
         );
