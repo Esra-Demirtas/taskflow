@@ -294,7 +294,7 @@
 - Middleware
 - Tema Desteği
 - Kullanıcı kaydı ve girişi
-- WT tabanlı kimlik doğrulama
+- PWT tabanlı kimlik doğrulama
 - WebSocket ile gerçek zamanlı güncellemeler
 - Sürükle ve bırak ile durum değiştirme (Kanban board)
 - Todo'lar için etiketler ve renkli işaretler
