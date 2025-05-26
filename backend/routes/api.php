@@ -1,5 +1,3 @@
-// routes/api.php dosyasında
-
 <?php
 
 use Illuminate\Support\Facades\Route;
@@ -10,10 +8,12 @@ use App\Http\Controllers\AuthController;
 
 // Public Authentication Routes
 Route::post('/register', [AuthController::class, 'register']);
-Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:login');
+// YORUM SATIRI YAPIN VEYA KALDIRIN: Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:login');
+Route::post('/login', [AuthController::class, 'login']); // Değişiklik burada
 
 // --- Protected Routes (Requires Authentication) ---
-Route::middleware(['auth:sanctum', 'throttle:api'])->group(function () {
+// YORUM SATIRI YAPIN VEYA KALDIRIN: Route::middleware(['auth:sanctum', 'throttle:api'])->group(function () {
+Route::middleware(['auth:sanctum'])->group(function () { // Değişiklik burada
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/user', [AuthController::class, 'user']);
 

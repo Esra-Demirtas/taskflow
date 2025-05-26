@@ -40,6 +40,11 @@ return [
             'driver' => 'session',
             'provider' => 'users',
         ],
+        // API kimlik doğrulaması için bu kısmı ekledik
+        'api' => [
+            'driver' => 'sanctum', // Laravel Sanctum kullanıyorsanız bu olmalı
+            'provider' => 'users',
+        ],
     ],
 
     /*
@@ -67,7 +72,7 @@ return [
 
         // 'users' => [
         //     'driver' => 'database',
-        //     'table' => 'users',
+        //     // 'table' => 'users',
         // ],
     ],
 

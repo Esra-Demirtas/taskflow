@@ -211,7 +211,7 @@
    DB_PORT=3306
    DB_DATABASE=taskflow
    DB_USERNAME=root
-   DB_PASSWORD=sifre123
+   DB_PASSWORD=yeni_sifreniz
    - Veritabanınızı oluşturmayı unutmayın (örneğin PhpMyAdmin veya MySQL Workbench kullanarak taskflow adında bir veritabanı oluşturun).
 
 4. Uygulama anahtarını oluşturun:

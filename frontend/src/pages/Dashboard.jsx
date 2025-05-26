@@ -487,7 +487,7 @@ const Dashboard = () => {
           {/* İstatistik kartları bölümü */}
           <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-6 mb-12">
             {[
-              { title: 'Toplam Todo', value: stats.totalTodos, bg: 'bg-blue-600' },
+              { title: 'Toplam Yapılacaklar', value: stats.totalTodos, bg: 'bg-blue-600' },
               { title: 'Beklemede', value: stats.pending, bg: 'bg-orange-500' },
               { title: 'Devam Ediyor', value: stats.inProgress, bg: 'bg-yellow-600' },
               { title: 'Tamamlandı', value: stats.completed, bg: 'bg-green-600' },
@@ -577,7 +577,7 @@ const Dashboard = () => {
 
           {/* Yaklaşan Bitiş Tarihleri Listesi - YENİ EKLENEN BÖLÜM (Liste Olarak) */}
           <section className="mb-8">
-            <h2 className="text-2xl font-semibold mb-4 text-gray-700">Yaklaşan Bitiş Tarihleri (Son 3 Gün)</h2>
+            <h2 className="text-2xl font-semibold mb-4 text-gray-700">Bitiş Tarihleri Yaklaşanlar (Son 3 Gün)</h2>
             {upcomingTodos.length > 0 ? (
               <ul className="divide-y divide-gray-200 border border-gray-200 rounded-lg shadow-sm bg-white">
                 {upcomingTodos.map(todo => (
