@@ -2,151 +2,113 @@
 
 namespace App\Services;
 
-use App\Repositories\TodoRepository;
-use Illuminate\Support\Facades\Validator;
-use Illuminate\Validation\ValidationException;
-use App\Models\Todo; // Todo modelini kullanacağımız için import edelim
+use App\Models\Todo;
+use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Pagination\LengthAwarePaginator;
 
 class TodoService
 {
-    protected $todoRepository;
-
-    public function __construct(TodoRepository $todoRepository)
+    public function getAllTodos(array $filters, int $limit, string $sort, string $order): LengthAwarePaginator
     {
-        $this->todoRepository = $todoRepository;
+        $query = Todo::with('categories', 'user');
+
+        if (isset($filters['status'])) {
+            $query->where('status', $filters['status']);
+        }
+        if (isset($filters['priority'])) {
+            $query->where('priority', $filters['priority']);
+        }
+        if (isset($filters['q'])) {
+            $query->where(function ($q) use ($filters) {
+                $q->where('title', 'like', '%' . $filters['q'] . '%')
+                  ->orWhere('description', 'like', '%' . $filters['q'] . '%');
+            });
+        }
+
+        return $query->orderBy($sort, $order)->paginate($limit);
     }
 
-    /**
-     * Tüm todoları getirir (filtreleme, sıralama ve sayfalama ile).
-     * Repositoru zaten kategorileri eager load ediyor.
-     */
-    public function getAllTodos(array $filters = [], int $limit = 10, string $sort = 'created_at', string $order = 'desc')
+    public function getTodoById(int $id): ?Todo
     {
-        return $this->todoRepository->getAll($filters, $limit, $sort, $order);
+        // Eloquent'in find() metodu zaten doğrudan modeli veya null döndürür.
+        // Ancak statik analiz aracının Builder döndürdüğünü belirtmesi durumunda,
+        // where() ve first() kombinasyonu daha açık olabilir.
+        // Normalde Todo::find($id) yeterlidir.
+        return Todo::with('categories', 'user')->where('id', $id)->first();
     }
 
-    
-
-    /**
-     * Belirli bir todoyu ID'sine göre getirir.
-     * Repositoru zaten kategorileri eager load ediyor.
-     */
-    public function getTodoById(int $id)
-    {
-        return $this->todoRepository->findById($id);
-    }
-
-    /**
-     * Yeni bir todo oluşturur ve kategorilerini ilişkilendirir.
-     */
     public function createTodo(array $data): Todo
     {
-        // category_ids'i veri dizisinden ayır, çünkü todo tablosunun sütunu değil.
-        $categoryIds = $data['category_ids'] ?? [];
-        unset($data['category_ids']); 
-
-        // Todo'yu oluştur
-        $todo = $this->todoRepository->create($data); // TodoRepository'nin create metodunu kullanıyoruz
-
-        // Kategorileri pivot tabloya ekle
-        if ($todo && !empty($categoryIds)) {
-            $todo->categories()->attach($categoryIds);
+        $todo = Todo::create($data);
+        if (isset($data['category_ids'])) {
+            $todo->categories()->sync($data['category_ids']);
         }
-
-        // İlişkili kategorilerle birlikte todo'yu döndür
-        $todo->load('categories'); 
-        
-        return $todo;
+        return $todo->load('categories', 'user');
     }
 
-    /**
-     * Mevcut bir todoyu günceller ve kategorilerini senkronize eder.
-     */
     public function updateTodo(int $id, array $data): ?Todo
     {
-        // category_ids'i veri dizisinden ayır.
-        // Array_key_exists kontrolü, category_ids'in request'te olup olmadığını kontrol eder
-        // Böylece eğer frontend category_ids göndermezse sync işlemi çalışmaz.
-        $categoryIds = null;
-        if (array_key_exists('category_ids', $data)) {
-            $categoryIds = $data['category_ids'];
-            unset($data['category_ids']); // Veritabanına kaydedilecek ana todo verisinden çıkar
-        }
-
-        // Todo'yu güncelle
-        $todo = $this->todoRepository->update($id, $data); // TodoRepository'nin update metodunu kullanıyoruz
-
-        // Kategorileri senkronize et
-        if ($todo && $categoryIds !== null) { // categoryIds null değilse (yani request'te gönderildiyse)
-            if (empty($categoryIds)) { // Eğer boş bir dizi gönderildiyse tüm kategorileri kaldır
-                $todo->categories()->detach();
-            } else { // Belirtilen kategorilerle senkronize et
-                $todo->categories()->sync($categoryIds);
-            }
-        }
-
-        // Güncellenen todo'yu ilişkili kategorilerle birlikte döndür
+        /** @var \App\Models\Todo|null $todo */ // Intelephense için tip ipucu
+        $todo = Todo::find($id);
         if ($todo) {
-            $todo->load('categories');
-        }
-        
-        return $todo;
-    }
-
-    /**
-     * Bir todonun durumunu günceller.
-     * Repositoru zaten kategorileri eager load ediyor.
-     */
-    public function updateStatus(int $id, string $status): ?Todo
-    {
-        $todo = $this->todoRepository->updateStatus($id, $status);
-        if ($todo) {
-             // Tutarlılık için güncellenen todo'yu kategorileriyle birlikte döndür
-            $todo->load('categories'); 
-        }
-        return $todo;
-    }
-
-    /**
-     * Belirli bir todoyu siler.
-     */
-    public function deleteTodo(int $id): bool
-    {
-        return $this->todoRepository->delete($id);
-    }
-
-    /**
-     * Todolar arasında arama yapar.
-     * Repositoru zaten kategorileri eager load ediyor.
-     */
-    public function searchTodos(string $query)
-    {
-        return $this->todoRepository->search($query);
-    }
-
-    protected function validate(array $data, $id = null)
-    {
-        $rules = [
-            'title' => 'required|string|min:3|max:100',
-            'description' => 'nullable|string|max:500',
-            'status' => 'required|in:pending,completed,in_progress,cancelled',
-            'priority' => 'required|in:low,medium,high',
-            'due_date' => 'nullable|date',
-        ];
-
-        if ($id) {
-            foreach ($rules as $key => $rule) {
-                if (str_contains($rule, 'required')) {
-                    $rules[$key] = str_replace('required', 'sometimes|required', $rule);
+            // update() metodu boolean döndürür, ancak biz güncellediğimiz $todo nesnesini döndürüyoruz.
+            // Statik analiz aracının kafasını karıştırmamak için bu satırın sonucu doğrudan kullanılmaz.
+            $todo->update($data);
+            if (array_key_exists('category_ids', $data)) {
+                if ($data['category_ids'] === null || count($data['category_ids']) === 0) {
+                    $todo->categories()->detach();
+                } else {
+                    $todo->categories()->sync($data['category_ids']);
                 }
             }
+            return $todo->load('categories', 'user');
         }
+        return null;
+    }
 
-
-        $validator = Validator::make($data, $rules);
-
-        if ($validator->fails()) {
-            throw new ValidationException($validator);
+    public function updateStatus(int $id, string $status): ?Todo
+    {
+        /** @var \App\Models\Todo|null $todo */ // Intelephense için tip ipucu
+        $todo = Todo::find($id);
+        if ($todo) {
+            // update() metodu boolean döndürür, ancak biz güncellediğimiz $todo nesnesini döndürüyoruz.
+            $todo->update(['status' => $status]);
+            return $todo->load('categories', 'user');
         }
+        return null;
+    }
+
+    public function deleteTodo(int $id): bool
+    {
+        $todo = Todo::find($id);
+        if ($todo) {
+            return $todo->delete();
+        }
+        return false;
+    }
+
+    public function searchTodos(string $query): LengthAwarePaginator
+    {
+        return Todo::with('categories', 'user')
+            ->where('title', 'like', '%' . $query . '%')
+            ->orWhere('description', 'like', '%' . $query . '%')
+            ->paginate(10); // Varsayılan sayfalama
+    }
+
+    /**
+     * Todo istatistiklerini döndürür.
+     *
+     * @return array
+     */
+    public function getTodoStats(): array
+    {
+        return [
+            'pending' => Todo::where('status', 'pending')->count(),
+            'in_progress' => Todo::where('status', 'in_progress')->count(),
+            'completed' => Todo::where('status', 'completed')->count(),
+            'cancelled' => Todo::where('status', 'cancelled')->count(),
+            'total' => Todo::count(),
+            'overdue' => Todo::where('due_date', '<', now())->whereIn('status', ['pending', 'in_progress'])->count(),
+        ];
     }
 }

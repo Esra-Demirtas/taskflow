@@ -56,10 +56,11 @@ class TodoRepository
      * @param int $id Todo ID'si
      * @return \App\Models\Todo|null
      */
-    public function findById(int $id): ?Todo
-    {
-        return $this->model->with('categories')->find($id);
-    }
+    public function findById($id): ?Todo
+{
+    return Todo::where('id', $id)->first(); // Bu Todo|null döner
+}
+
 
     /**
      * Yeni bir todo oluşturur.
@@ -85,7 +86,9 @@ class TodoRepository
      */
     public function update(int $id, array $data): ?Todo
     {
-        $todo = $this->model->find($id);
+        /** @var Todo|null $todo */
+        $todo = Todo::find($id);
+
         if ($todo) {
             $todo->update($data);
         }
@@ -101,7 +104,9 @@ class TodoRepository
      */
     public function updateStatus(int $id, string $status): ?Todo
     {
-        $todo = $this->model->find($id);
+        /** @var Todo|null $todo */
+        $todo = Todo::find($id);
+
         if ($todo) {
             $todo->update(['status' => $status]);
         }

@@ -3,6 +3,7 @@
 namespace App\Repositories;
 
 use App\Models\Category;
+use Illuminate\Database\Eloquent\Collection; // Collection tip ipucu için
 
 class CategoryRepository
 {
@@ -14,45 +15,47 @@ class CategoryRepository
     }
 
     /**
-     * Tüm kategorileri listele
+     * Tüm kategorileri listeler.
      *
      * @return \Illuminate\Database\Eloquent\Collection
      */
-    public function all()
+    public function all(): Collection
     {
         return $this->model->all();
     }
 
     /**
-     * ID ile kategori getir
+     * ID ile kategori getirir.
      *
-     * @param int $id
-     * @return Category|null
+     * @param int $id Kategori ID'si
+     * @return \App\Models\Category|null
      */
-    public function find(int $id)
+    public function find(int $id): ?Category
     {
-        return $this->model->find($id);
+        // Statik analiz aracının dönüş tipini daha doğru algılaması için where()->first() kullanıldı.
+        // Fonksiyonel olarak model->find($id) ile aynı sonucu verir.
+        return $this->model->where('id', $id)->first();
     }
 
     /**
-     * Yeni kategori oluştur
+     * Yeni kategori oluşturur.
      *
-     * @param array $data
-     * @return Category
+     * @param array $data Oluşturulacak kategori verileri
+     * @return \App\Models\Category
      */
-    public function create(array $data)
+    public function create(array $data): Category
     {
         return $this->model->create($data);
     }
 
     /**
-     * Kategori güncelle
+     * Kategori günceller.
      *
-     * @param int $id
-     * @param array $data
-     * @return bool
+     * @param int $id Güncellenecek kategori ID'si
+     * @param array $data Güncelleme verileri
+     * @return bool Güncelleme başarılı ise true, aksi halde false
      */
-    public function update(int $id, array $data)
+    public function update(int $id, array $data): bool
     {
         $category = $this->find($id);
         if (!$category) {
@@ -63,12 +66,12 @@ class CategoryRepository
     }
 
     /**
-     * Kategori sil (soft delete yoksa kalıcı siler)
+     * Kategori siler (soft delete yoksa kalıcı siler).
      *
-     * @param int $id
-     * @return bool|null
+     * @param int $id Silinecek kategori ID'si
+     * @return bool Silme başarılı ise true, aksi halde false
      */
-    public function delete(int $id)
+    public function delete(int $id): bool
     {
         $category = $this->find($id);
         if (!$category) {
@@ -79,12 +82,12 @@ class CategoryRepository
     }
 
     /**
-     * Belirli bir kategorinin todo'larını getir
+     * Belirli bir kategoriye ait tüm todoları getirir.
      *
-     * @param int $id
+     * @param int $id Kategori ID'si
      * @return \Illuminate\Database\Eloquent\Collection|null
      */
-    public function getTodos(int $id)
+    public function getTodos(int $id): ?Collection
     {
         $category = $this->find($id);
         if (!$category) {

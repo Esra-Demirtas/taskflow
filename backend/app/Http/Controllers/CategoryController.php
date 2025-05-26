@@ -5,18 +5,14 @@ namespace App\Http\Controllers;
 use App\Http\Controllers\Controller;
 use App\Services\CategoryService;
 use Illuminate\Http\Request;
-use Illuminate\Http\JsonResponse; // JsonResponse tip bildirimi için
-
-// Handler.php tarafından yakalanacak istisnalar için manuel importlara gerek yok:
-// use Illuminate\Validation\ValidationException; 
-
-use App\Traits\ApiResponse; // <-- Bu satırı ekleyin
-use Symfony\Component\HttpFoundation\Response; // <-- HTTP durum kodları için bu satırı ekleyin
-use Illuminate\Database\Eloquent\ModelNotFoundException; // Kaynak bulunamadığında fırlatmak için
+use Illuminate\Http\JsonResponse;
+use App\Traits\ApiResponse;
+use Symfony\Component\HttpFoundation\Response;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 
 class CategoryController extends Controller
 {
-    use ApiResponse; // <-- Bu satırı ekleyin
+    use ApiResponse;
 
     protected $service;
 
@@ -71,11 +67,10 @@ class CategoryController extends Controller
      */
     public function store(Request $request): JsonResponse
     {
-        // Doğrulama kurallarını burada tanımlayın.
-        // Hatalı doğrulama durumunda ValidationException otomatik olarak Handler.php tarafından yakalanır.
+        // Renk alanı için validasyon kuralı eklendi
         $validatedData = $request->validate([
             'name' => 'required|string|max:255|unique:categories,name',
-            // Diğer doğrulama kuralları
+            'color' => 'nullable|string|size:7|regex:/^#[0-9A-Fa-f]{6}$/', // Renk validasyonu
         ]);
 
         $category = $this->service->create($validatedData);
@@ -94,11 +89,10 @@ class CategoryController extends Controller
      */
     public function update(Request $request, $id): JsonResponse
     {
-        // Doğrulama kurallarını burada tanımlayın.
-        // `name` alanı güncellenirken kendi ID'sini göz ardı etmek için `unique` kuralına dikkat edin.
+        // Renk alanı için validasyon kuralı eklendi
         $validatedData = $request->validate([
             'name' => 'sometimes|required|string|max:255|unique:categories,name,' . $id,
-            // Diğer doğrulama kuralları
+            'color' => 'nullable|string|size:7|regex:/^#[0-9A-Fa-f]{6}$/', // Renk validasyonu
         ]);
 
         $category = $this->service->update($id, $validatedData);

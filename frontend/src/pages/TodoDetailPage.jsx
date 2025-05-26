@@ -109,7 +109,7 @@ const TodoDetailPage = () => {
                     </div>
                     <div>
                         <p className="text-gray-500 font-medium">Açıklama</p>
-                        <p className="mt-1">{todo.description || <span className="italic text-gray-400">Yok</span>}</p>
+                        <p className="mt-1">{todo.description || <span className=" text-gray-400">Belirtilmedi</span>}</p>
                     </div>
                     <div>
                         <p className="text-gray-500 font-medium">Durum</p>
@@ -146,7 +146,7 @@ const TodoDetailPage = () => {
                                     </span>
                                 ))
                             ) : (
-                                <span className="italic text-gray-400">Yok</span>
+                                <span className=" text-gray-400">Belirtilmedi</span>
                             )}
                         </div>
                     </div>
